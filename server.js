@@ -535,6 +535,7 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
 
   const startTime = Date.now();
   let fullResponse = '';
+  let thinkBuffer = ''; // Cross-chunk buffer for <think> tag parsing
 
   try {
     const proc = spawn('bash', ['-lc', fullCmd], {
@@ -545,19 +546,70 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
     proc.stdout.on('data', (chunk) => {
       const text = chunk.toString();
       fullResponse += text;
-      // With -Q flag, output is clean — stream directly
-      const cleaned = text
-        .replace(/╭[═─╮][\s\S]*?╰[═─╯][^\n]*\n?/g, '') // safety: strip any remaining banners
+
+      // Step 1: Strip metadata lines (these are CLI bookkeeping, not model output)
+      const stripped = text
+        .replace(/╭[═─╮][\s\S]*?╰[═─╯][^\n]*\n?/g, '')        // safety: strip any remaining banners
         .replace(/^Session:\s+\d+.*$/gm, '')
         .replace(/^Resume this session with:.*$/gm, '')
         .replace(/^Duration:.*$/gm, '')
         .replace(/^Messages:.*$/gm, '')
         .replace(/^Query:.*$/gm, '')
         .replace(/^-{10,}$/gm, '')
-        .replace(/^Initializing agent.*$/gm, '');
-      if (cleaned.trim()) {
-        res.write(`data: ${JSON.stringify({ type: 'token', content: cleaned })}\n\n`);
+        .replace(/^Initializing agent.*$/gm, '')
+        .replace(/^↻\s+Resumed\s+session.*$/gm, '')            // "↻ Resumed session 20260510_..."
+        .replace(/^session_id:\s*\S+.*$/gm, '');               // "session_id: 20260510_..."
+
+      if (!stripped.trim()) return;
+
+      // Step 2: Parse <think>...</think> blocks and emit them as reasoning events
+      // Handle cross-chunk thinking via thinkBuffer
+      thinkBuffer += stripped;
+
+      let output = '';
+      let reasoningAccum = '';
+      let i =0;
+
+      while (i < thinkBuffer.length) {
+        const openIdx = thinkBuffer.indexOf('<think>', i);
+        if (openIdx === -1) {
+          // No more opening tags — rest is plain text
+          output += thinkBuffer.slice(i);
+          break;
+        }
+        // Emit text before <think>
+        output += thinkBuffer.slice(i, openIdx);
+        const closeIdx = thinkBuffer.indexOf('</think>', openIdx);
+        if (closeIdx === -1) {
+          // Opening tag without closing tag yet — keep in buffer
+          thinkBuffer = thinkBuffer.slice(openIdx);
+          // Emit what we have as output so far
+          if (output.trim()) {
+            res.write(`data: ${JSON.stringify({ type: 'token', content: output })}\n\n`);
+          }
+          return;
+        }
+        // Extract the thinking content
+        const thinkContent = thinkBuffer.slice(openIdx + '<think>'.length, closeIdx);
+        if (thinkContent.trim()) {
+          reasoningAccum += thinkContent;
+        }
+        // Skip past the closing tag
+        i = closeIdx + '</think>'.length;
       }
+
+      // Emit accumulated reasoning
+      if (reasoningAccum.trim()) {
+        res.write(`data: ${JSON.stringify({ type: 'reasoning', content: reasoningAccum })}\n\n`);
+      }
+
+      // Emit remaining text (outside think blocks)
+      if (output.trim()) {
+        res.write(`data: ${JSON.stringify({ type: 'token', content: output })}\n\n`);
+      }
+
+      // Reset buffer — we consumed everything
+      thinkBuffer = '';
     });
 
     proc.stderr.on('data', (chunk) => {
@@ -566,7 +618,14 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
 
     proc.on('close', () => {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      // Extract real hermes session ID from output
+      // Flush any remaining think buffer (unclosed <think> tag)
+      if (thinkBuffer.trim()) {
+        const flushed = thinkBuffer.replace(/^<think>/i, '').trim();
+        if (flushed) {
+          res.write(`data: ${JSON.stringify({ type: 'token', content: flushed })}\n\n`);
+        }
+      }
+      // Extract real hermes session ID from output (use raw fullResponse)
       const sidMatch = fullResponse.match(/session_id:\s*([0-9]{8}_[0-9]{6}_[a-f0-9]+)/i)
                    || fullResponse.match(/Session:\s+([0-9]{8}_[0-9]{6}_[a-f0-9]+)/i);
       const newSessionId = sidMatch ? sidMatch[1] : sessionId || '';

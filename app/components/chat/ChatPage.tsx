@@ -26,6 +26,26 @@ interface Message {
   reasoning?: string;
 }
 
+/** Parse <think>...</think> blocks out of assistant message content into separate reasoning field */
+function extractThinking(msg: Message): Message {
+  if (!msg.content || msg.role !== 'assistant') return msg;
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+  let match;
+  const reasoningParts: string[] = [];
+  while ((match = thinkRegex.exec(msg.content)) !== null) {
+    if (match[1].trim()) reasoningParts.push(match[1].trim());
+  }
+  if (reasoningParts.length === 0) return msg;
+  const cleanedContent = msg.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  return {
+    ...msg,
+    content: cleanedContent || msg.content,
+    reasoning: msg.reasoning
+      ? msg.reasoning + '\n' + reasoningParts.join('\n')
+      : reasoningParts.join('\n'),
+  };
+}
+
 export default function ChatPage() {
   // State
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -101,7 +121,8 @@ export default function ChatPage() {
       setMessages([]);
       const data = await api.get<{ ok: boolean; messages: Message[]; session: Session }>(`/api/sessions/${encodeURIComponent(sessionId)}/messages`);
       if (data.ok) {
-        setMessages(data.messages || []);
+        // Parse thinking tags from stored messages
+        setMessages((data.messages || []).map(extractThinking));
         setTitle(data.session?.title || sessionId);
       }
       localStorage.setItem('hci-last-session', sessionId);
@@ -184,7 +205,19 @@ export default function ChatPage() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              if (data.type === 'token') {
+              if (data.type === 'reasoning') {
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.role === 'assistant') {
+                    updated[updated.length - 1] = {
+                      ...last,
+                      reasoning: (last.reasoning || '') + (data.content || ''),
+                    };
+                  }
+                  return updated;
+                });
+              } else if (data.type === 'token') {
                 setMessages((prev) => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
@@ -202,6 +235,8 @@ export default function ChatPage() {
                   localStorage.setItem('hci-last-session', data.sessionId);
                   loadSessions();
                 }
+                // Post-stream: parse any remaining <think> tags from assistant messages
+                setMessages((prev) => prev.map(extractThinking));
               } else if (data.type === 'error') {
                 setError(data.content || 'Stream error');
               }
