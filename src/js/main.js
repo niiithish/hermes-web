@@ -683,6 +683,7 @@ function filterChatBySource(value) {
 
 // Reload current session messages from DB (silent — no loading indicator)
 let _reloadInProgress = false;
+let _reloadRetryCount = 0;
 async function reloadCurrentSessionMessages() {
   const sessionId = state._currentChatSession;
   if (!sessionId) return;
@@ -730,7 +731,22 @@ async function reloadCurrentSessionMessages() {
       modelBadge.style.display = 'none';
     }
 
-    if (!data.messages || data.messages.length === 0) { console.warn('[Chat] no messages in session'); _reloadInProgress = false; return; }
+    if (!data.messages || data.messages.length === 0) {
+      // Race: chat.done may fire before DB write completes.
+      // Retry with backoff up to 3 times (total ~1.5s) before giving up.
+      const retries = _reloadRetryCount || 0;
+      if (retries < 3) {
+        _reloadRetryCount = retries + 1;
+        _reloadInProgress = false;
+        await new Promise(r => setTimeout(r, 500));
+        return reloadCurrentSessionMessages();
+      }
+      _reloadRetryCount = 0;
+      console.warn('[Chat] no messages in session after retries');
+      _reloadInProgress = false;
+      return;
+    }
+    _reloadRetryCount = 0;
 
     // Rebuild messages cleanly
     container.innerHTML = '';
@@ -1186,8 +1202,6 @@ async function sendChatMessage() {
     cursors?.forEach(c => c.remove());
     // Update session title from sidebar
     updateChatHeader();
-    // Refresh sidebar to show new sessions or update last activity
-    refreshChatSidebar();
   }
 }
 
@@ -1714,48 +1728,32 @@ function finalizeWsChat() {
     if (panel && panel.children.length <= 1) panel.style.display = 'none';
   }, 6000);
 
-  // CAPTURE streaming text BEFORE removing streamEl.
-  // chat.done fires BEFORE Hermes finishes writing the final message to SQLite,
-  // so reloadCurrentSessionMessages() may miss the streaming content.
+  // Instead of removing the streaming element and reloading from DB
+  // (which causes a flicker + race with SQLite writes), just convert
+  // the streaming element in-place to a final message.
   const streamEl = document.getElementById('chat-streaming');
-  let capturedText = '';
   if (streamEl) {
+    // Remove cursor, remove streaming class
+    const cursors = streamEl.querySelectorAll('.chat-cursor');
+    cursors.forEach(c => c.remove());
+    streamEl.classList.remove('chat-streaming');
+    // Render final content
     const span = streamEl.querySelector('#gw-stream-text');
-    if (span) capturedText = span.textContent || '';
-    streamEl.remove();
+    const body = streamEl.querySelector('.msg-body');
+    if (span && body) {
+      const text = span.textContent || '';
+      body.innerHTML = renderChatContent(text);
+      highlightCodeBlocks(body);
+    }
   }
-  // Also remove any orphaned thinking panel
+  // Remove orphaned thinking panel
   const thinkEl = document.getElementById('chat-thinking-panel');
   if (thinkEl) thinkEl.remove();
 
-  // Reload from DB for clean final render, then merge captured streaming text
-  // in case the final message hadn't been written to DB yet.
-  if (state._currentChatSession) {
-    reloadCurrentSessionMessages().then(() => {
-      // Merge captured streaming text if the last assistant message has no body
-      if (capturedText) {
-        const messagesDiv = document.getElementById('chat-messages');
-        if (messagesDiv) {
-          const lastMsg = messagesDiv.querySelector('.msg-assistant:last-child');
-          const lastBody = lastMsg?.querySelector('.msg-body');
-          if (lastBody && !lastBody.textContent?.trim()) {
-            lastBody.innerHTML = renderChatContent(capturedText.substring(0, 8000));
-            highlightCodeBlocks(lastBody);
-          }
-        }
-      }
-    }).finally(() => {
-      state._finalizeInProgress = false;
-    }).catch((e) => {
-      state._finalizeInProgress = false;
-      console.error('[Chat] reload error:', e);
-    });
-  } else {
-    state._finalizeInProgress = false;
-  }
-  refreshChatSidebar();
-  updateChatHeader();
+  // Clean up
+  state._finalizeInProgress = false;
   state._chatLock = false;
+  updateChatHeader();
   // Play completion sound if enabled
   playChatComplete();
 
