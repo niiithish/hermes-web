@@ -7,6 +7,8 @@ npm-debug.log*
 .control-interface/
 hermes_conversation_*.json
 dist/
+.next/
+next-env.d.ts
 website/
 
 # Internal docs — not for public repo

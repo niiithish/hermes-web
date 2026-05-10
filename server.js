@@ -130,8 +130,8 @@ function execHermes(args, timeout = 30000, stdin = null) {
 const cfg = getConfig();
 
 const PORT            = cfg.port;
-const CONTROL_PASSWORD = cfg.password;
-const CONTROL_SECRET  = cfg.secret;
+const CONTROL_PASSWORD = cfg.password;  // may be null (first-run / multi-user auth)
+const CONTROL_SECRET  = cfg.secret || crypto.randomBytes(32).toString('hex');
 const AUTH_COOKIE      = cfg.session.cookieName;
 const PROJECT_ROOT     = __dirname;
 const PROJECTS_ROOT    = cfg.projectsRoot;
@@ -175,9 +175,6 @@ const IGNORED_DIRS = new Set([
   'node_modules', '.git', 'cache', 'document_cache', 'audio_cache', 'checkpoints', 'logs', 'tmp', '.next', '.turbo', '.cache',
 ]);
 
-if (!CONTROL_PASSWORD || !CONTROL_SECRET) {
-  throw new Error('Missing HERMES_CONTROL_PASSWORD or HERMES_CONTROL_SECRET environment variables');
-}
 
 const app = express();
 

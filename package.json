@@ -4,17 +4,19 @@
   "description": "Self-hosted web dashboard for the Hermes AI agent stack",
   "main": "server.js",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0",
+    "bun": ">=1.0.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "serve": "node server.js",
+    "start": "bun run server.js",
+    "dev": "next dev",
+    "dev:server": "bun run server.js",
+    "dev:all": "concurrently \"bun run server.js\" \"next dev\"",
+    "build": "next build",
+    "start:next": "next start",
     "setup": "bash install.sh",
-    "test": "node --test",
-    "reset-password": "node scripts/reset-password.js"
+    "test": "bun test",
+    "reset-password": "bun run scripts/reset-password.js"
   },
   "dependencies": {
     "@pydantic/genai-prices": "^0.0.56",
@@ -29,11 +31,22 @@
     "helmet": "^8.1.0",
     "js-yaml": "^4.1.1",
     "multer": "^2.1.1",
+    "next": "^16.2.6",
     "node-pty": "^1.1.0",
+    "react": "^19",
+    "react-dom": "^19",
     "ws": "^8.18.0",
     "yaml": "^2.8.3"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9",
+    "postcss": "^8",
+    "tailwindcss": "^4",
+    "typescript": "^5",
     "vite": "^8.0.8"
   }
 }
