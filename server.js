@@ -530,13 +530,14 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
   const modelFlag = model ? `-m ${model}` : '';
   // Resume existing session, or create new with empty --continue flag
   const resumeFlag = sessionId ? `--resume ${sessionId}` : '--continue ""';
-  const fullCmd = `hermes chat -Q -q ${escapedMsg} ${profileFlag} ${modelFlag} ${resumeFlag} 2>&1`;
+  const fullCmd = `hermes chat -Q -q ${escapedMsg} ${profileFlag} ${modelFlag} ${resumeFlag}`;
 
   // SSE response
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
   });
 
   const startTime = Date.now();
@@ -546,16 +547,18 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
   try {
     const proc = spawn('bash', ['-lc', fullCmd], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, HERMES_HOME: path.join(os.homedir(), '.hermes') },
+      env: { ...process.env, HERMES_HOME: path.join(os.homedir(), '.hermes'), PYTHONUNBUFFERED: '1' },
     });
 
     proc.stdout.on('data', (chunk) => {
       const text = chunk.toString();
       fullResponse += text;
 
-      // Step 1: Strip metadata lines (these are CLI bookkeeping, not model output)
+      // Step 1: Strip metadata lines (CLI bookkeeping — not model output).
+      // The CLI may emit session stats, resume banners, pong keepalives, etc.
+      // We strip aggressively so only the model response reaches the client.
       const stripped = text
-        .replace(/╭[═─╮][\s\S]*?╰[═─╯][^\n]*\n?/g, '')        // safety: strip any remaining banners
+        .replace(/╭[═─╮][\s\S]*?╰[═─╯][^\n]*\n?/g, '')        // box-drawing banners
         .replace(/^Session:\s+\d+.*$/gm, '')
         .replace(/^Resume this session with:.*$/gm, '')
         .replace(/^Duration:.*$/gm, '')
@@ -563,8 +566,14 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
         .replace(/^Query:.*$/gm, '')
         .replace(/^-{10,}$/gm, '')
         .replace(/^Initializing agent.*$/gm, '')
-        .replace(/^↻\s+Resumed\s+session.*$/gm, '')            // "↻ Resumed session 20260510_..."
-        .replace(/^session_id:\s*\S+.*$/gm, '');               // "session_id: 20260510_..."
+        .replace(/^↻\s+Resumed\s+session.*$/gm, '')            // "↻ Resumed session …"
+        .replace(/^session_id:\s*\S+.*$/gm, '')                // "session_id: 20260510_…"
+        .replace(/^\d+\s+user messages?,\s*\d+\s+total messages?\)\s*$/gm, '')  // session stats
+        .replace(/^pong\b.*$/gmi, '')                            // WebSocket pong keepalive
+        .replace(/^ping\b.*$/gmi, '')                            // WebSocket ping keepalive
+        .replace(/^(✅|⚠️|🔁|⏳)\s*.*$/gmu, '')                     // emoji-prefixed status lines
+        .replace(/^\s*\[\d+:\d+:\d+\]\s*.*$/gm, '')           // timestamp-prefixed log lines
+        .replace(/^\s*$/gm, '');                                 // blank lines
 
       if (!stripped.trim()) return;
 
@@ -619,7 +628,20 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
     });
 
     proc.stderr.on('data', (chunk) => {
-      res.write(`data: ${JSON.stringify({ type: 'error', content: chunk.toString() })}\n\n`);
+      // Only surface genuine errors, not progress/status noise from the CLI
+      const text = chunk.toString().trim();
+      if (!text) return;
+      // Filter out known progress / keepalive chatter
+      const isNoise =
+        /pong/i.test(text) ||
+        /ping/i.test(text) ||
+        /messages?\).*total/i.test(text) ||
+        /^✅/mu.test(text) ||
+        /^⚠️/mu.test(text) ||
+        /resumed/i.test(text) ||
+        /initializing/i.test(text);
+      if (isNoise) return;
+      res.write(`data: ${JSON.stringify({ type: 'error', content: text })}\n\n`);
     });
 
     proc.on('close', () => {

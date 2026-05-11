@@ -16,6 +16,8 @@ import {
   RiHistoryLine,
   RiStopFill,
   RiMenuLine,
+  RiArrowRightSLine,
+  RiArrowDownSLine,
 } from '@remixicon/react';
 
 interface Session {
@@ -81,10 +83,12 @@ export default function ChatPage() {
   const [title, setTitle] = useState('New Chat');
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
+  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamRef = useRef<AbortController | null>(null);
+  const streamingMsgIndexRef = useRef<number | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -183,7 +187,11 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     const assistantMsg: Message = { role: 'assistant', content: '', timestamp: Date.now() };
+    const assistantIdx = messages.length + 1;
+    streamingMsgIndexRef.current = assistantIdx;
     setMessages((prev) => [...prev, assistantMsg]);
+    // Auto-expand reasoning so the user sees thinking arrive live
+    setExpandedReasoning((prev) => new Set(prev).add(assistantIdx));
     setStreaming(true);
     setElapsed(0);
 
@@ -241,10 +249,13 @@ export default function ChatPage() {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
                   if (last && last.role === 'assistant') {
-                    updated[updated.length - 1] = {
+                    const newContent = last.content + (data.content || '');
+                    // Continuously extract <think> blocks from streaming content
+                    // so reasoning appears live, not just at the end
+                    updated[updated.length - 1] = extractThinking({
                       ...last,
-                      content: last.content + (data.content || ''),
-                    };
+                      content: newContent,
+                    });
                   }
                   return updated;
                 });
@@ -271,6 +282,15 @@ export default function ChatPage() {
       clearInterval(elapsedTimer);
       setStreaming(false);
       streamRef.current = null;
+      // Auto-collapse reasoning now that streaming is done
+      if (streamingMsgIndexRef.current !== null) {
+        setExpandedReasoning((prev) => {
+          const next = new Set(prev);
+          next.delete(streamingMsgIndexRef.current!);
+          return next;
+        });
+        streamingMsgIndexRef.current = null;
+      }
     }
   };
 
@@ -474,7 +494,9 @@ export default function ChatPage() {
               <EmptyDescription>Start a conversation with your Hermes agent</EmptyDescription>
             </Empty>
           )}
-          {messages.map((msg, idx) => (
+          {messages.map((msg, idx) => {
+            const isStreaming = streaming && idx === messages.length - 1;
+            return (
             <div
               key={idx}
               className={cn(
@@ -482,38 +504,63 @@ export default function ChatPage() {
                 msg.role === 'user' ? 'items-end self-end' : 'items-start self-start'
               )}
             >
-              <div
-                className={cn(
-                  'px-3.5 py-2 rounded-lg border text-sm leading-relaxed break-words',
-                  msg.role === 'user'
-                    ? 'bg-primary/10 border-primary'
-                    : 'bg-card border-border'
-                )}
-                dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
-              />
-              {msg.reasoning && (
-                <div className="mt-1 px-2.5 py-1.5 text-[11px] text-muted-foreground bg-muted/50 rounded-md border border-border max-w-full">
-                  <div className="font-medium mb-0.5 text-[10px] text-amber-600 dark:text-amber-400">
-                    Reasoning
-                  </div>
-                  <div className="whitespace-pre-wrap break-words">{msg.reasoning}</div>
+              {/* Thinking section: always visible during streaming, or when reasoning exists */}
+              {(msg.reasoning || isStreaming) && (
+                <div className="mb-0.5">
+                  <button
+                    onClick={() =>
+                      setExpandedReasoning((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(idx)) next.delete(idx);
+                        else next.add(idx);
+                        return next;
+                      })
+                    }
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none flex items-center gap-1"
+                  >
+                    <span className="text-amber-600 dark:text-amber-400 font-medium inline-flex items-center gap-0.5">
+                      {expandedReasoning.has(idx) ? <RiArrowDownSLine className="size-4" /> : <RiArrowRightSLine className="size-4" />}
+                      Thinking
+                    </span>
+                  </button>
+                  {expandedReasoning.has(idx) && (
+                    <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-muted-foreground/20 pl-3 leading-relaxed">
+                      {msg.reasoning || (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-block size-2 rounded-full bg-amber-500 animate-pulse" />
+                          Thinking...
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
+              )}
+              {/* Only show content bubble if there's actual content */}
+              {msg.content && (
+                <div
+                  className={cn(
+                    'px-3.5 py-2 rounded-lg border text-sm leading-relaxed break-words',
+                    msg.role === 'user'
+                      ? 'bg-primary/10 border-primary'
+                      : 'bg-card border-border'
+                  )}
+                  dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
+                />
               )}
               {msg.token_count && msg.role === 'assistant' && (
                 <div className="text-[10px] text-muted-foreground mt-0.5">
                   {msg.token_count} tokens
                 </div>
               )}
+              {/* Inline streaming status for the last message */}
+              {isStreaming && (
+                <div className="flex items-center gap-1.5 text-muted-foreground text-xs mt-1">
+                  <span className="inline-block size-2 rounded-full bg-primary animate-pulse" />
+                  Streaming... ({formatTime(elapsed)})
+                </div>
+              )}
             </div>
-          ))}
-
-          {/* Streaming indicator */}
-          {streaming && (
-            <div className="flex items-center gap-1.5 px-3.5 py-2 text-muted-foreground text-xs">
-              <span className="inline-block size-2 rounded-full bg-primary animate-pulse" />
-              Streaming... ({formatTime(elapsed)})
-            </div>
-          )}
+          )})}
 
           <div ref={messagesEndRef} />
         </div>

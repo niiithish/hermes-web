@@ -2,18 +2,53 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/app/lib/api-client';
+import { useTheme } from '@/app/hooks/useTheme';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
+  PointElement, Title, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Bar, Line } from 'react-chartjs-2';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
+
+// ─── Chart theme colours (matching globals.css chart variables) ──────────────
+
+const CHART_COLORS_LIGHT = [
+  'oklch(0.841 0.238 128.85)',    // primary
+  'oklch(0.648 0.2 131.684)',      // sidebar-primary
+  'oklch(0.87 0 0)',               // chart-1
+  'oklch(0.556 0 0)',              // chart-2
+  'oklch(0.439 0 0)',              // chart-3
+  'oklch(0.841 0.238 128.85 / 0.65)',
+  'oklch(0.648 0.2 131.684 / 0.65)',
+  'oklch(0.87 0 0 / 0.65)',
+];
+
+const CHART_COLORS_DARK = [
+  'oklch(0.768 0.233 130.85)',     // primary
+  'oklch(0.768 0.233 130.85 / 0.75)', // sidebar-primary
+  'oklch(0.87 0 0)',               // chart-1
+  'oklch(0.556 0 0)',              // chart-2
+  'oklch(0.439 0 0)',              // chart-3
+  'oklch(0.768 0.233 130.85 / 0.65)',
+  'oklch(0.768 0.233 130.85 / 0.75 / 0.65)',
+  'oklch(0.87 0 0 / 0.65)',
+];
+
+const CHART_COLORS = CHART_COLORS_DARK; // default for initial render
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +83,7 @@ interface BudgetStatus { over: boolean; percentage: number; }
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function UsagePage() {
+  const { theme } = useTheme();
   const [days, setDays] = useState('7');
   const [agent, setAgent] = useState('');
   const [budget, setBudget] = useState(() => {
@@ -126,10 +162,12 @@ export default function UsagePage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Chart config
-  const chartTextColor = 'var(--foreground)';
-  const chartGridColor = 'rgba(220,203,181,0.08)';
-  const chartColors = ['#ffac02', '#4ecdc4', '#ff6b6b', '#a78bfa', '#34d399', '#60a5fa', '#fb923c', '#f472b6'];
+  // ── Chart helpers ─────────────────────────────────────────────────────────
+
+  const isDark = theme === 'dark';
+  const chartColors = isDark ? CHART_COLORS_DARK : CHART_COLORS_LIGHT;
+  const chartTextColor = isDark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)';
+  const chartGridColor = isDark ? 'oklch(1 0 0 / 0.08)' : 'oklch(0 0 0 / 0.08)';
 
   function getTokenChartData() {
     const hasDaily = !!(daily && daily.daily && daily.daily.length > 0);
@@ -137,9 +175,9 @@ export default function UsagePage() {
     if (hasDaily) {
       labels = daily!.daily.map(r => r.date);
       datasets = [
-        { label: 'Input', data: daily!.daily.map(r => r.input_tokens || 0), backgroundColor: '#ffac02', borderRadius: 4 },
-        { label: 'Output', data: daily!.daily.map(r => r.output_tokens || 0), backgroundColor: '#4ecdc4', borderRadius: 4 },
-        { label: 'Cache', data: daily!.daily.map(r => r.cache_read_tokens || 0), backgroundColor: '#a78bfa', borderRadius: 4 },
+        { label: 'Input', data: daily!.daily.map(r => r.input_tokens || 0), backgroundColor: chartColors[0], borderRadius: 4 },
+        { label: 'Output', data: daily!.daily.map(r => r.output_tokens || 0), backgroundColor: chartColors[1], borderRadius: 4 },
+        { label: 'Cache', data: daily!.daily.map(r => r.cache_read_tokens || 0), backgroundColor: chartColors[3], borderRadius: 4 },
       ];
     } else if (overview?.models && overview.models.length > 0) {
       const top = overview.models.slice(0, 8);
@@ -151,7 +189,7 @@ export default function UsagePage() {
       labels, datasets,
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: hasDaily, labels: { color: chartTextColor, font: { size: 10 } } } },
+        plugins: { legend: { display: hasDaily, labels: { color: chartTextColor, font: { size: 11 } } } },
         scales: {
           x: { stacked, ticks: { color: chartTextColor, maxRotation: 45, font: { size: 10 } }, grid: { color: chartGridColor } },
           y: { stacked, ticks: { color: chartTextColor, callback: (v: any) => formatNumber(Number(v)), font: { size: 10 } }, grid: { color: chartGridColor } },
@@ -170,7 +208,7 @@ export default function UsagePage() {
           options: {
             responsive: true, maintainAspectRatio: false, indexAxis: 'y' as const,
             plugins: { legend: { display: false } },
-            scales: { x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } }, y: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } } },
+            scales: { x: { ticks: { color: chartTextColor, font: { size: 10 } }, grid: { color: chartGridColor } }, y: { ticks: { color: chartTextColor, font: { size: 10 } }, grid: { color: chartGridColor } } },
           },
         };
       }
@@ -199,160 +237,221 @@ export default function UsagePage() {
     for (let i = 0; i < projectionData.length - projStart; i++) { projectionData[projStart + i] = lastCumCost + projAvg * (i + 1); }
     const actualPadded = [...cumulativeActual, ...new Array(extendedLabels.length - cumulativeActual.length).fill(null)];
     const datasets: any[] = [
-      { label: 'Cumulative Cost ($)', data: actualPadded, borderColor: '#ffac02', backgroundColor: 'rgba(255,172,2,0.1)', fill: true, tension: 0.3, pointRadius: 3, spanGaps: false },
-      { label: 'Monthly Projection', data: projectionData, borderColor: 'rgba(255,172,2,0.45)', borderDash: [6, 4], backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 0, spanGaps: false },
+      { label: 'Cumulative Cost ($)', data: actualPadded, borderColor: chartColors[0], backgroundColor: isDark ? 'oklch(0.768 0.233 130.85 / 0.12)' : 'oklch(0.841 0.238 128.85 / 0.12)', fill: true, tension: 0.3, pointRadius: 3, spanGaps: false },
+      { label: 'Monthly Projection', data: projectionData, borderColor: isDark ? 'oklch(0.768 0.233 130.85 / 0.45)' : 'oklch(0.841 0.238 128.85 / 0.45)', borderDash: [6, 4], backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 0, spanGaps: false },
     ];
-    if (budget > 0) datasets.push({ label: `Budget ($${budget})`, data: new Array(extendedLabels.length).fill(budget), borderColor: '#ff6b6b', borderDash: [8, 4], backgroundColor: 'transparent', fill: false, pointRadius: 0, borderWidth: 2, spanGaps: true });
+    if (budget > 0) datasets.push({ label: `Budget ($${budget})`, data: new Array(extendedLabels.length).fill(budget), borderColor: isDark ? 'oklch(0.704 0.191 22.216)' : 'oklch(0.577 0.245 27.325)', borderDash: [8, 4], backgroundColor: 'transparent', fill: false, pointRadius: 0, borderWidth: 2, spanGaps: true });
     return {
       labels: extendedLabels, datasets, monthlyPace: projAvg * 30,
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: true, labels: { color: chartTextColor, font: { size: 10 }, boxWidth: 12, padding: 8 } }, tooltip: { callbacks: { label: (ctx: any) => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}` } } },
+        plugins: { legend: { display: true, labels: { color: chartTextColor, font: { size: 10 }, boxWidth: 12, padding: 10 } }, tooltip: { callbacks: { label: (ctx: any) => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}` } } },
         scales: { x: { ticks: { color: chartTextColor, maxRotation: 45, font: { size: 10 } }, grid: { color: chartGridColor } }, y: { ticks: { color: chartTextColor, callback: (v: any) => '$' + Number(v).toFixed(2), font: { size: 10 } }, grid: { color: chartGridColor }, beginAtZero: true } },
       } as const,
     };
   }
 
-  function getModelChartData() {
-    const models = daily?.byModel || overview?.models || [];
-    if (!models || models.length === 0) return null;
-    const top = models.slice(0, 6);
-    return {
-      labels: top.map(m => m.name || (m as any).model),
-      datasets: [{ data: top.map(m => m.tokens || (m as any).total_tokens || 0), backgroundColor: chartColors.slice(0, 6), borderWidth: 0 }],
-      options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom' as const, labels: { color: chartTextColor, font: { size: 10 }, padding: 8 } } } } as const,
-    };
-  }
-
   const tokenChart = getTokenChartData();
   const costChart = getCostChartData();
-  const modelChart = getModelChartData();
+
+  // ─── Stats config ──────────────────────────────────────────────────────────
+
+  const overviewStats = overview ? [
+    { label: 'Sessions', value: overview.sessions },
+    { label: 'Messages', value: (overview.messages || 0).toLocaleString() },
+    { label: 'Input Tokens', value: formatNumber(overview.inputTokens) },
+    { label: 'Output Tokens', value: formatNumber(overview.outputTokens) },
+    { label: 'Total Tokens', value: formatNumber(overview.totalTokens) },
+    { label: 'Est. Cost', value: overview.cost },
+    { label: 'Active Time', value: overview.activeTime },
+    { label: 'Avg Session', value: overview.avgSession },
+  ] : [];
 
   return (
-    <div className="p-6 h-full overflow-y-auto space-y-4">
+    <div className="flex flex-col h-full overflow-y-auto gap-4 p-6">
       {/* Page Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-wider uppercase">Usage &amp; Analytics</h1>
           <p className="text-sm text-muted-foreground mt-1">Token usage, costs, and activity breakdown</p>
         </div>
-        <div className="flex gap-2 items-center flex-wrap">
-          <select value={days} onChange={e => setDays(e.target.value)} className="h-7 rounded-md border border-input bg-input/20 px-2 text-xs">
-            <option value="1">Today</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
-          </select>
-          <select value={agent} onChange={e => setAgent(e.target.value)} className="h-7 rounded-md border border-input bg-input/20 px-2 text-xs">
-            <option value="">All agents</option>
-            {profiles.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-          </select>
+
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={days} onValueChange={v => v && setDays(v)}>
+            <SelectTrigger size="sm" className="w-[110px]">
+              <SelectValue placeholder="Days" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Today</SelectItem>
+              <SelectItem value="7">7 days</SelectItem>
+              <SelectItem value="30">30 days</SelectItem>
+              <SelectItem value="90">90 days</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={agent} onValueChange={v => setAgent(v || '')}>
+            <SelectTrigger size="sm" className="w-[140px]">
+              <SelectValue placeholder="All agents" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All agents</SelectItem>
+              {profiles.map(p => (
+                <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
             {loading ? <><Spinner className="size-3" /> Loading...</> : 'Apply'}
           </Button>
-          <div className="flex items-center gap-1">
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
+
+          <div className="flex items-center gap-1.5">
             <label className="text-xs text-muted-foreground whitespace-nowrap">Budget $</label>
-            <Input type="number" value={budget || ''} onChange={e => handleBudgetChange(parseFloat(e.target.value) || 0)} min={0} step={1} placeholder="0" className="w-20 h-7 text-xs" />
+            <Input
+              type="number"
+              value={budget || ''}
+              onChange={e => handleBudgetChange(parseFloat(e.target.value) || 0)}
+              min={0} step={1} placeholder="0"
+              className="w-20 h-7 text-xs"
+            />
           </div>
+
           {budgetStatus && (
             <Badge variant={budgetStatus.over ? 'destructive' : 'secondary'} className="text-xs">
-              {budgetStatus.over ? `Over budget ${budgetStatus.percentage.toFixed(0)}%` : `${budgetStatus.percentage.toFixed(0)}% under`}
+              {budgetStatus.over
+                ? `Over budget ${budgetStatus.percentage.toFixed(0)}%`
+                : `${budgetStatus.percentage.toFixed(0)}% under`}
             </Badge>
           )}
         </div>
       </div>
 
-      {error && <div className="text-destructive text-sm py-2">{error}</div>}
+      {error && (
+        <div className="text-destructive text-sm px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20">
+          {error}
+        </div>
+      )}
 
-      {/* Overview stats bar */}
+      {/* Overview stats */}
       <Card>
-        <CardContent className="pt-4">
+        <CardHeader className="pb-2">
+          <CardTitle>Overview</CardTitle>
+          <CardDescription>Aggregated metrics for the selected period</CardDescription>
+        </CardHeader>
+        <CardContent>
           {loading && !overview ? (
-            <div className="flex gap-6 flex-wrap items-center text-muted-foreground text-sm"><Spinner className="size-3" /> Loading...</div>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Spinner className="size-3" /> Loading...
+            </div>
           ) : overview ? (
-            <div className="flex gap-6 flex-wrap items-center">
-              {[{ label: 'Sessions', value: overview.sessions, color: '#ffac02' },
-                { label: 'Messages', value: (overview.messages || 0).toLocaleString(), color: '#ffac02' },
-                { label: 'Input Tokens', value: formatNumber(overview.inputTokens), color: '#4ecdc4' },
-                { label: 'Output Tokens', value: formatNumber(overview.outputTokens), color: '#ff6b6b' },
-                { label: 'Total Tokens', value: formatNumber(overview.totalTokens), color: '#ffac02' },
-                { label: 'Est. Cost', value: overview.cost, color: '#ffac02' },
-              ].map((stat, i) => (
-                <div key={i} className="text-center min-w-[60px]">
-                  <div className="text-lg font-bold" style={{ color: stat.color }}>{stat.value}</div>
-                  <div className="text-[10px] text-muted-foreground">{stat.label}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+              {overviewStats.map((stat, i) => (
+                <div key={i} className="flex flex-col items-center text-center gap-1">
+                  <span className="text-lg font-bold text-primary tabular-nums">{stat.value}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{stat.label}</span>
                 </div>
               ))}
-              <div className="text-center min-w-[80px]">
-                <div className="text-base font-semibold text-muted-foreground">{overview.activeTime}</div>
-                <div className="text-[10px] text-muted-foreground">Active Time</div>
-              </div>
-              <div className="text-center min-w-[80px]">
-                <div className="text-base font-semibold text-muted-foreground">{overview.avgSession}</div>
-                <div className="text-[10px] text-muted-foreground">Avg Session</div>
-              </div>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
       {/* Charts: 2-column layout */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Token trend */}
         <Card>
-          <CardHeader><CardTitle>Daily Token Trend</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Daily Token Trend</CardTitle>
+            <CardDescription>Input · Output · Cache read tokens per day</CardDescription>
+          </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[240px]">
               {tokenChart && tokenChart.labels.length > 0 ? (
                 <Bar data={{ labels: tokenChart.labels, datasets: tokenChart.datasets }} options={tokenChart.options} />
-              ) : <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>}
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Cost chart + model doughnut */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Daily Cost
               {costChart && 'monthlyPace' in costChart && (
-                <span className="text-xs font-normal text-muted-foreground">· ~${(costChart as any).monthlyPace.toFixed(2)}/mo pace</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  · ~${(costChart as any).monthlyPace.toFixed(2)}/mo pace
+                </span>
               )}
             </CardTitle>
+            <CardDescription>Cumulative cost with end-of-month projection</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="h-[140px]">
-              {costChart ? <Line data={{ labels: costChart.labels, datasets: costChart.datasets }} options={costChart.options} /> : <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>}
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Model Distribution</div>
-              <div className="h-[160px]">
-                {modelChart ? <Doughnut data={{ labels: modelChart.labels, datasets: modelChart.datasets }} options={modelChart.options} /> : <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>}
-              </div>
+            <div className="h-[160px]">
+              {costChart ? (
+                <Line data={{ labels: costChart.labels, datasets: costChart.datasets }} options={costChart.options} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Models + Platforms + Top Tools */}
-      <div className="grid grid-cols-3 gap-4">
-        {[{
-          title: 'Models', data: overview?.models,
-          render: (m: ModelEntry, i: number) => <span key={i}>{m.name}: {m.sessions} · {formatNumber(m.tokens)}</span>
-        }, {
-          title: 'Platforms', data: overview?.platforms,
-          render: (p: PlatformEntry, i: number) => <span key={i}>{p.name}: {p.sessions} · {formatNumber(p.tokens)}</span>
-        }, {
-          title: 'Top Tools', data: overview?.topTools?.slice(0, 5),
-          render: (t: ToolEntry, i: number) => <span key={i}>{t.name}: {t.calls} ({t.pct})</span>
-        }].map((section, si) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          {
+            title: 'Models',
+            desc: 'Token usage by model',
+            data: overview?.models,
+            render: (m: ModelEntry) => (
+              <span>{m.name}: {m.sessions} · {formatNumber(m.tokens)}</span>
+            ),
+          },
+          {
+            title: 'Platforms',
+            desc: 'Activity by platform',
+            data: overview?.platforms,
+            render: (p: PlatformEntry) => (
+              <span>{p.name}: {p.sessions} · {formatNumber(p.tokens)}</span>
+            ),
+          },
+          {
+            title: 'Top Tools',
+            desc: 'Most-used tools',
+            data: overview?.topTools?.slice(0, 5),
+            render: (t: ToolEntry) => (
+              <span>{t.name}: {t.calls} ({t.pct})</span>
+            ),
+          },
+        ].map((section, si) => (
           <Card key={si}>
-            <CardHeader><CardTitle>{section.title}</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>{section.title}</CardTitle>
+              <CardDescription>{section.desc}</CardDescription>
+            </CardHeader>
             <CardContent>
               {section.data && section.data.length > 0 ? (
                 <div className="space-y-1">
                   {(section.data as any[]).map((item: any, i: number) => (
-                    <div key={i} className="flex justify-between items-center py-1 border-b border-border last:border-0 text-sm">
-                      <span className="text-muted-foreground">{item.name}</span>
-                      <span className="font-medium">{section.render(item, i)}</span>
+                    <div
+                      key={i}
+                      className="flex justify-between items-center py-1.5 border-b border-border last:border-0 text-sm"
+                    >
+                      <span className="text-muted-foreground truncate mr-2">{item.name}</span>
+                      <span className="font-medium text-right shrink-0">{section.render(item)}</span>
                     </div>
                   ))}
                 </div>
-              ) : <div className="text-muted-foreground text-sm">No data</div>}
+              ) : (
+                <div className="text-muted-foreground text-sm py-2">No data</div>
+              )}
             </CardContent>
           </Card>
         ))}

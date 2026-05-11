@@ -10,9 +10,9 @@ const fontSans = Geist({
   variable: "--font-sans",
 });
 
-const fontSerif = Geist({
+const fontHeading = Geist({
   subsets: ["latin"],
-  variable: "--font-serif",
+  variable: "--font-heading",
 });
 
 const fontMono = Geist_Mono({
@@ -55,10 +55,10 @@ export default function RootLayout({
       </head>
       <body
         className={cn(
-          "h-full font-mono antialiased",
+          "h-full font-sans antialiased",
           fontSans.variable,
-          fontSerif.variable,
           fontMono.variable,
+          fontHeading.variable,
         )}
       >
         <Providers>{children}</Providers>

@@ -127,7 +127,7 @@ export default function FilesPage() {
     <div className="flex-1 overflow-y-auto py-2">
       {/* Breadcrumb */}
       <div className="flex items-center gap-0.5 whitespace-nowrap overflow-x-auto px-3 py-2 border-b text-xs font-mono text-muted-foreground">
-        <span className="text-accent cursor-pointer shrink-0" onClick={() => navTo('')}>
+        <span className="text-primary cursor-pointer shrink-0" onClick={() => navTo('')}>
           <RiHome3Line className="inline h-3.5 w-3.5" /> .hermes
         </span>
         {breadcrumbParts.map((part, i) => {
@@ -135,7 +135,7 @@ export default function FilesPage() {
           return (
             <span key={i} className="shrink-0">
               <span className="px-1 text-muted-foreground/50">/</span>
-              <span className="text-accent cursor-pointer" onClick={() => navTo(accumPath)}>{part}</span>
+              <span className="text-primary cursor-pointer" onClick={() => navTo(accumPath)}>{part}</span>
             </span>
           );
         })}
@@ -148,7 +148,7 @@ export default function FilesPage() {
         <>
           {listParent !== undefined && (
             <div
-              className="flex items-center px-3 py-2 cursor-pointer text-accent text-sm font-mono transition-colors hover:bg-accent/5 min-h-[36px]"
+              className="flex items-center px-3 py-2 cursor-pointer text-primary text-sm font-mono transition-colors hover:bg-primary/5 min-h-[36px]"
               onClick={() => navTo(listParent || '')}
             >
               <RiFolderOpenLine className="mr-1.5 h-4 w-4 shrink-0" /> ..
@@ -163,7 +163,7 @@ export default function FilesPage() {
               <div
                 key={item.path}
                 className={`flex items-center justify-between px-3 py-2 cursor-pointer text-sm font-mono transition-colors min-h-[36px] select-none ${
-                  isDir ? 'text-accent hover:bg-accent/5' : 'text-foreground hover:bg-muted/30'
+                  isDir ? 'text-primary hover:bg-primary/5' : 'text-foreground hover:bg-muted/30'
                 } ${currentFilePath === item.path ? 'bg-muted/40' : ''}`}
                 onClick={() => navTo(item.path, !isDir)}
               >

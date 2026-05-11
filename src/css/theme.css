@@ -29,8 +29,8 @@
   --pink: #b07c9c;
 
   --shadow: 0 20px 70px rgba(0, 0, 0, 0.4);
-  --radius: 8px;
-  --radius-lg: 16px;
+  --radius: 0;
+  --radius-lg: 0;
   --font: 'JetBrains Mono', ui-monospace, monospace;
   --transition: 0.2s ease;
 }
@@ -62,6 +62,8 @@
   --pink: #9c6c8c;
 
   --shadow: 0 20px 70px rgba(0, 0, 0, 0.1);
+  --radius: 0;
+  --radius-lg: 0;
 }
 
 /* ============================================
