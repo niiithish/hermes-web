@@ -24,7 +24,8 @@ interface Profile {
 // ─── Parse CLI box-drawing table output ──────────────────────────────────────
 
 function parseSkillTable(output: string): Skill[] {
-  const lines = String(output || '').split('\n');
+  const text = String(output || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  const lines = text.split('\n');
   const skills: Skill[] = [];
   const rowPattern = /[│┃]\s*([^│┃\s][^│┃]*?)\s*[│┃]\s*([^│┃]*?)\s*[│┃]\s*(\S+)\s*[│┃]\s*(\S+)\s*[│┃]\s*([^│┃]*?)\s*[│┃]/;
   for (const line of lines) {
@@ -48,7 +49,8 @@ function parseSkillTable(output: string): Skill[] {
 
 // Also parse the browse-specific table format (with leading number column)
 function parseBrowseTable(output: string): Skill[] {
-  const lines = String(output || '').split('\n');
+  const text = String(output || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  const lines = text.split('\n');
   const skills: Skill[] = [];
   for (const line of lines) {
     if (line.includes('┏') || line.includes('┗') || line.includes('┡') || line.includes('┩') || line.includes('╍')) continue;
@@ -520,7 +522,7 @@ export default function SkillsPage() {
           {skills.map((s, i) => {
             const installed = isInstalled(s);
             return (
-              <div key={s.identifier || s.name || i} style={cardStyle}>
+              <div key={s.num || s.identifier || s.name || i} style={cardStyle}>
                 <div style={cardTitleStyle}>{s.name}</div>
                 <div style={{ fontSize: '12px', color: 'var(--fg-muted)', marginTop: '4px', flex: 1 }}>
                   {s.description}

@@ -126,6 +126,12 @@ function execHermes(args, timeout = 30000, stdin = null) {
   });
 }
 
+// Strip ANSI escape codes (SGR sequences like \x1b[...m) from text
+const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]/g;
+function stripAnsi(text) {
+  return String(text).replace(ANSI_RE, '');
+}
+
 // ── Load HCI config (hci.config.yaml + env overrides) ──
 const cfg = getConfig();
 
@@ -3819,7 +3825,8 @@ app.get('/api/memory/:profile', requireAuth, async (req, res) => {
 app.get('/api/skills/browse/:page', requireAuth, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.params.page) || 1);
-    const output = await execHermes(['skills', 'browse', '--page', String(page)], 15000);
+    const raw = await execHermes(['skills', 'browse', '--page', String(page)], 15000);
+    const output = stripAnsi(raw);
     res.json({ ok: true, output, page });
   } catch (e) {
     res.json({ ok: false, error: e.message });
@@ -3830,7 +3837,8 @@ app.get('/api/skills/browse/:page', requireAuth, async (req, res) => {
 app.get('/api/skills/search/:query', requireAuth, async (req, res) => {
   try {
     const query = decodeURIComponent(req.params.query);
-    const output = await execHermes(['skills', 'search', query], 15000);
+    const raw = await execHermes(['skills', 'search', query], 15000);
+    const output = stripAnsi(raw);
     // Parse table output into structured results
     const lines = output.split('\n');
     const results = [];
@@ -3860,7 +3868,8 @@ app.get('/api/skills/search/:query', requireAuth, async (req, res) => {
 app.get('/api/skills/inspect/:name', requireAuth, async (req, res) => {
   try {
     const name = decodeURIComponent(req.params.name);
-    const output = await execHermes(['skills', 'inspect', name], 15000);
+    const raw = await execHermes(['skills', 'inspect', name], 15000);
+    const output = stripAnsi(raw);
     res.json({ ok: true, output });
   } catch (e) {
     res.json({ ok: false, error: e.message });
@@ -3873,7 +3882,8 @@ app.get('/api/skills/list/:profile', requireAuth, async (req, res) => {
     const profile = sanitizeProfileName(req.params.profile);
     if (!profile) return res.status(400).json({ ok: false, error: 'invalid profile name' });
     const profArg = profile === 'default' ? [] : ['-p', profile];
-    const output = await execHermes([...profArg, 'skills', 'list'], 15000);
+    const raw = await execHermes([...profArg, 'skills', 'list'], 15000);
+    const output = stripAnsi(raw);
     res.json({ ok: true, output });
   } catch (e) {
     res.json({ ok: false, error: e.message });
