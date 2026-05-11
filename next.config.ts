@@ -6,6 +6,7 @@ const backendWsUrl = backendUrl.replace(/^http/, 'ws');
 const nextConfig: NextConfig = {
   output: 'standalone',
   devIndicators: false,
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
 
   async rewrites() {
     return [

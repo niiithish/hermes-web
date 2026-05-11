@@ -23,7 +23,6 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.9.0",
     "chart.js": "^4.5.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
@@ -34,6 +33,7 @@
     "next": "^16.2.6",
     "node-pty": "^1.1.0",
     "react": "^19",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19",
     "ws": "^8.18.0",
     "yaml": "^2.8.3"
@@ -46,7 +46,6 @@
     "concurrently": "^9",
     "postcss": "^8",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vite": "^8.0.8"
+    "typescript": "^5"
   }
 }

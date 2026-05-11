@@ -11,7 +11,7 @@ const pty = require('node-pty');
 const { WebSocketServer } = require('ws');
 const rateLimit = require('express-rate-limit');
 const yaml = require('js-yaml');
-const Database = require('better-sqlite3');
+const Database = require('./lib/database');
 const { getConfig } = require('./lib/hci-config');
 const {
   mergeSessionsFromSources,
@@ -1855,21 +1855,66 @@ setInterval(() => {
 }, 15 * 60 * 1000);
 
 // Track current user in request (bound to token)
-const tokenToUser = new Map(); // token -> { username, role }
+// Stateless tokens: the Map is a performance cache only — tokens can be validated
+// without it, so sessions survive server restarts.
+const tokenToUser = new Map(); // token -> { username, role, permissions }
 
 function createAuthToken(username, role, permissions) {
+  // Stateless token: embed user identity so it survives server restarts
   const ts = String(Date.now());
-  const sig = hmac(ts + ':' + username);
-  const token = ts + '.' + sig;
+  const payload = Buffer.from(JSON.stringify({ username, role, permissions })).toString('base64url');
+  const sig = hmac(ts + '.' + payload);
+  const token = ts + '.' + payload + '.' + sig;
+  // Cache for performance
   tokenToUser.set(token, { username, role, permissions });
   return token;
+}
+
+function parseAndValidateToken(token) {
+  // Format: timestamp.base64(payload).sig
+  const firstDot = token.indexOf('.');
+  if (firstDot === -1) return null;
+  // Check for old format: ts.sig (no user payload)
+  const lastDot = token.lastIndexOf('.');
+  if (lastDot === firstDot) {
+    // Old format — can't recover user info, fall back to cache
+    return null;
+  }
+  const ts = token.substring(0, firstDot);
+  const payload = token.substring(firstDot + 1, lastDot);
+  const sig = token.substring(lastDot + 1);
+  // Validate expiry (24 hours)
+  if (Date.now() - Number(ts) > 24 * 60 * 60 * 1000) return null;
+  // Validate HMAC
+  if (hmac(ts + '.' + payload) !== sig) return null;
+  // Parse user payload
+  try {
+    const json = Buffer.from(payload, 'base64url').toString('utf8');
+    const user = JSON.parse(json);
+    if (!user.username || !user.role) return null;
+    // Verify user still exists in the database
+    const stored = findUser(user.username);
+    if (!stored) return null;
+    return { username: stored.username, role: stored.role, permissions: stored.permissions };
+  } catch {
+    return null;
+  }
 }
 
 function getCurrentUser(req) {
   const cookies = parseCookies(req);
   const token = cookies[AUTH_COOKIE];
   if (!token) return null;
-  return tokenToUser.get(token) || null;
+  // Check cache first
+  const cached = tokenToUser.get(token);
+  if (cached) return cached;
+  // Validate stateless token and cache on success
+  const user = parseAndValidateToken(token);
+  if (user) {
+    tokenToUser.set(token, user);
+    return user;
+  }
+  return null;
 }
 
 function requireRole(role) {
@@ -2305,7 +2350,7 @@ app.get('/api/dashboard-state', requireAuth, async (req, res) => {
 app.get('/api/sessions', requireAuth, async (req, res) => {
   // Short list for sidebar — limit 10, cached 10s
   const data = await getSessions();
-  res.json({ sessions: data, cachedAt: hermesSidebarSessionsCache.at });
+  res.json({ ok: true, sessions: data, cachedAt: hermesSidebarSessionsCache.at });
 });
 
 app.get('/api/all-sessions', requireAuth, async (req, res) => {
@@ -2706,10 +2751,15 @@ app.get('/api/logs', requireAuth, requirePerm('logs.view'), async (req, res) => 
     const level = String(req.query.level || '').toLowerCase(); // error, warn, info, debug
     const search = String(req.query.search || '').toLowerCase();
 
+    let profileDirs = [];
+    try {
+      profileDirs = fs.readdirSync(path.join(os.homedir(), '.hermes', 'profiles')).filter(d => {
+        try { return fs.statSync(path.join(os.homedir(), '.hermes', 'profiles', d)).isDirectory(); } catch { return false; }
+      });
+    } catch {}
+
     const profiles = profile === 'all'
-      ? ['default', ...fs.readdirSync(path.join(os.homedir(), '.hermes', 'profiles')).filter(d => {
-          try { return fs.statSync(path.join(os.homedir(), '.hermes', 'profiles', d)).isDirectory(); } catch { return false; }
-        })]
+      ? ['default', ...profileDirs]
       : [sanitizeProfileName(profile)].filter(Boolean);
 
     const sources = source === 'all' ? ['agent', 'error'] : [source];
@@ -2730,7 +2780,12 @@ app.get('/api/logs', requireAuth, requirePerm('logs.view'), async (req, res) => 
             allLines.push(parseLogLine(line, prof, 'gateway'));
           }
         } else {
-          const logFile = path.join(logBase, `${src}.log`);
+          let logFile = path.join(logBase, `${src}.log`);
+          // Fallback: some log files have 's' suffix (errors.log vs error.log)
+          if (!fs.existsSync(logFile)) {
+            const altFile = path.join(logBase, `${src}s.log`);
+            if (fs.existsSync(altFile)) logFile = altFile;
+          }
           if (fs.existsSync(logFile)) {
             const raw = await shell(`tail -n ${lines} "${logFile}" 2>/dev/null`, '5s');
             for (const line of raw.split('\n').filter(Boolean)) {
@@ -2765,7 +2820,7 @@ app.get('/api/logs', requireAuth, requirePerm('logs.view'), async (req, res) => 
 
 // Parse a log line into structured format
 function parseLogLine(line, profile, source) {
-  // Try to extract: [TIMESTAMP] [LEVEL] [COMPONENT] message
+  // Try to extract: [TIMESTAMP] [LEVEL] [COMPONENT] message (Hermes agent format)
   const match = line.match(/^\[([^\]]+)\]\s*\[([^\]]+)\]\s*(?:\[([^\]]+)\]\s*)?(.+)$/);
   if (match) {
     const [, ts, lvl, comp, msg] = match;
@@ -2780,6 +2835,24 @@ function parseLogLine(line, profile, source) {
       raw: line,
     };
   }
+
+  // Try Python-style: YYYY-MM-DD HH:MM:SS,mmm LEVEL component: message
+  const pyMatch = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+(\w+)\s+([\w.]+):\s*(.+)$/);
+  if (pyMatch) {
+    const [, ts, lvl, comp, msg] = pyMatch;
+    const tsMs = new Date(ts.replace(',', '.')).getTime();
+    return {
+      ts: tsMs || 0,
+      timestamp: ts,
+      level: lvl.toLowerCase(),
+      component: comp || source,
+      profile,
+      source,
+      message: msg.trim(),
+      raw: line,
+    };
+  }
+
   // Fallback: journalctl format or plain line
   // Try to detect level from content
   let level = 'info';

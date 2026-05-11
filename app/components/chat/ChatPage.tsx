@@ -7,13 +7,17 @@ interface Session {
   id: string;
   title?: string;
   parent_session_id?: string;
-  started_at: number;
+  started_at?: number;
   ended_at?: number;
-  message_count: number;
+  message_count?: number;
+  messageCount?: number;
   source?: string;
   model?: string;
   preview?: string;
   last_activity?: number;
+  lastActive?: string;
+  startedAt?: number;
+  endedAt?: number;
 }
 
 interface Message {
@@ -424,8 +428,8 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div style={{ fontSize: '10px', color: 'var(--fg-subtle)', marginTop: '2px' }}>
-                    {session.message_count} msgs
-                    {session.started_at && ` · ${formatDate(session.started_at)}`}
+                    {(session.messageCount || session.message_count || 0)} msgs
+                    {((session.startedAt || session.started_at)) && ` · ${formatDate(session.startedAt || session.started_at!)}`}
                   </div>
                 </div>
               ))}
