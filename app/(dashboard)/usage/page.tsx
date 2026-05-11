@@ -391,8 +391,8 @@ export default function UsagePage() {
             </CardTitle>
             <CardDescription>Cumulative cost with end-of-month projection</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="h-[160px]">
+          <CardContent>
+            <div className="h-[240px]">
               {costChart ? (
                 <Line data={{ labels: costChart.labels, datasets: costChart.datasets }} options={costChart.options} />
               ) : (

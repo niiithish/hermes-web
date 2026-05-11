@@ -97,6 +97,12 @@ export default function ChatPage() {
   const streamRef = useRef<AbortController | null>(null);
   const streamingMsgIndexRef = useRef<number | null>(null);
   const reasoningBufferRef = useRef("");
+  // Batching: content tokens are buffered until we know whether reasoning is coming.
+  // This prevents content from appearing first and then the Thinking section
+  // popping in above it, which causes a jarring layout jump.
+  const hasReasoningForMsgRef = useRef(false);
+  const pendingContentRef = useRef("");
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -128,9 +134,14 @@ export default function ChatPage() {
       const data = await api.get<{ ok: boolean; sessions: Session[] }>(
         "/api/sessions",
       );
-      if (data.ok) setSessions(data.sessions || []);
+      if (data.ok) {
+        setSessions(data.sessions || []);
+        return data.sessions || [];
+      }
+      return [];
     } catch (err) {
       console.error("Failed to load sessions:", err);
+      return [];
     } finally {
       if (!silent) setLoadingSessions(false);
     }
@@ -162,8 +173,15 @@ export default function ChatPage() {
       }>(`/api/sessions/${encodeURIComponent(sessionId)}/messages`);
       if (data.ok) {
         // Parse thinking tags from stored messages
-        setMessages((data.messages || []).map(extractThinking));
-        setTitle(data.session?.title || sessionId);
+        const parsedMessages = (data.messages || []).map(extractThinking);
+        setMessages(parsedMessages);
+        // Title: prefer DB title, then first user message, then fallback
+        const firstUserMsg = parsedMessages.find((m) => m.role === "user");
+        const fallbackTitle = firstUserMsg?.content
+          ? firstUserMsg.content.slice(0, 50) +
+            (firstUserMsg.content.length > 50 ? "…" : "")
+          : "Untitled Chat";
+        setTitle(data.session?.title || fallbackTitle);
       }
       localStorage.setItem("hci-last-session", sessionId);
     } catch (err) {
@@ -260,27 +278,98 @@ export default function ChatPage() {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.type === "reasoning") {
-                // Buffer reasoning during streaming — apply atomically at the end
-                reasoningBufferRef.current += (data.content || "");
-              } else if (data.type === "token") {
+                // Reasoning has started — flush any buffered content now so both
+                // appear together in the first paint of the bubble.
+                hasReasoningForMsgRef.current = true;
+                reasoningBufferRef.current += data.content || "";
+                if (flushTimerRef.current) {
+                  clearTimeout(flushTimerRef.current);
+                  flushTimerRef.current = null;
+                }
                 setMessages((prev) => {
                   const updated = [...prev];
-                  const last = updated[updated.length - 1];
+                  const lastIdx = updated.length - 1;
+                  const last = updated[lastIdx];
                   if (last && last.role === "assistant") {
-                    updated[updated.length - 1] = {
+                    const pending = pendingContentRef.current;
+                    pendingContentRef.current = "";
+                    updated[lastIdx] = {
                       ...last,
-                      content: last.content + (data.content || ""),
+                      reasoning:
+                        (last.reasoning || "") + (data.content || ""),
+                      content: pending ? last.content + pending : last.content,
                     };
                   }
                   return updated;
                 });
+                // Auto-expand reasoning during streaming so it's visible
+                if (streamingMsgIndexRef.current !== null) {
+                  setExpandedReasoning((prev) => {
+                    const next = new Set(prev);
+                    next.add(streamingMsgIndexRef.current!);
+                    return next;
+                  });
+                }
+              } else if (data.type === "token") {
+                if (hasReasoningForMsgRef.current) {
+                  // Reasoning already started — show content immediately alongside it
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    if (last && last.role === "assistant") {
+                      updated[updated.length - 1] = {
+                        ...last,
+                        content: last.content + (data.content || ""),
+                      };
+                    }
+                    return updated;
+                  });
+                } else {
+                  // No reasoning yet — buffer content so it doesn't appear before
+                  // the Thinking section. Set a timeout in case no reasoning ever comes.
+                  pendingContentRef.current += data.content || "";
+                  if (!flushTimerRef.current) {
+                    flushTimerRef.current = setTimeout(() => {
+                      // No reasoning after 500ms — assume none, flush content
+                      setMessages((prev) => {
+                        const updated = [...prev];
+                        const last = updated[updated.length - 1];
+                        if (last && last.role === "assistant") {
+                          updated[updated.length - 1] = {
+                            ...last,
+                            content:
+                              last.content + pendingContentRef.current,
+                          };
+                          pendingContentRef.current = "";
+                        }
+                        return updated;
+                      });
+                      flushTimerRef.current = null;
+                    }, 500);
+                  }
+                }
               } else if (data.type === "done") {
                 if (data.sessionId) {
                   setCurrentSessionId(data.sessionId);
                   localStorage.setItem("hci-last-session", data.sessionId);
+                  // Derive title from first user message (already in state)
+                  setMessages((prev) => {
+                    const firstUserMsg = prev.find((m) => m.role === "user");
+                    if (firstUserMsg?.content) {
+                      const t = firstUserMsg.content.slice(0, 50);
+                      setTitle(t + (firstUserMsg.content.length > 50 ? "…" : ""));
+                    }
+                    return prev;
+                  });
+                  // Silently refresh sessions list in background (no re-render loop)
                   loadSessions(true);
                 }
-                // Apply buffered reasoning + parse any remaining <think> tags atomically
+                // Flush any remaining pending content, apply buffered reasoning,
+                // and parse <think> tags.
+                if (flushTimerRef.current) {
+                  clearTimeout(flushTimerRef.current);
+                  flushTimerRef.current = null;
+                }
                 setMessages((prev) => {
                   const updated = [...prev];
                   const lastIdx = updated.length - 1;
@@ -290,12 +379,18 @@ export default function ChatPage() {
                     if (reasoningBufferRef.current) {
                       msg.reasoning = reasoningBufferRef.current;
                     }
+                    if (pendingContentRef.current) {
+                      msg.content =
+                        msg.content + pendingContentRef.current;
+                      pendingContentRef.current = "";
+                    }
                     msg = extractThinking(msg);
                     updated[lastIdx] = msg;
                   }
                   return updated;
                 });
                 reasoningBufferRef.current = "";
+                hasReasoningForMsgRef.current = false;
               } else if (data.type === "error") {
                 const errText = data.content || "Stream error";
                 // Silently drop CLI bookkeeping noise that leaks as errors
@@ -314,6 +409,25 @@ export default function ChatPage() {
       clearInterval(elapsedTimer);
       setStreaming(false);
       streamRef.current = null;
+      // Flush remaining buffered content (e.g. on abort / error)
+      if (pendingContentRef.current) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.role === "assistant") {
+            updated[updated.length - 1] = {
+              ...last,
+              content: last.content + pendingContentRef.current,
+            };
+            pendingContentRef.current = "";
+          }
+          return updated;
+        });
+      }
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
       // Auto-collapse reasoning now that streaming is done
       if (streamingMsgIndexRef.current !== null) {
         setExpandedReasoning((prev) => {
@@ -324,6 +438,7 @@ export default function ChatPage() {
         streamingMsgIndexRef.current = null;
       }
       reasoningBufferRef.current = "";
+      hasReasoningForMsgRef.current = false;
     }
   };
 
@@ -563,6 +678,14 @@ export default function ChatPage() {
                     )}
                   >
                     {/* Thinking section inside the bubble */}
+                    {/* During streaming with no reasoning yet but content is buffered,
+                        show a stable placeholder so the bubble doesn't jump later. */}
+                    {isStreaming && !msg.reasoning && !msg.content && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                        <span className="inline-block size-2 rounded-full bg-muted-foreground animate-pulse" />
+                        Thinking...
+                      </div>
+                    )}
                     {msg.reasoning && (
                       <div className="mb-1">
                         <button
@@ -597,14 +720,26 @@ export default function ChatPage() {
                         )}
                       </div>
                     )}
-                    {/* Content */}
-                    {msg.content && (
-                      <div
-                        dangerouslySetInnerHTML={{
-                          __html: renderContent(msg.content),
-                        }}
-                      />
-                    )}
+                    {/* Content — strip partial <think> blocks during streaming so
+                        literal thinking tags don't flash before they're extracted. */}
+                    {msg.content && (() => {
+                      // During streaming, strip incomplete <think> blocks from display
+                      // so the raw XML doesn't flicker before extractThinking runs at done.
+                      const display = isStreaming
+                        ? msg.content
+                            .replace(/<think>[\s\S]*?<\/think>/g, "")
+                            .replace(/<think>[\s\S]*$/, "")
+                            .trim()
+                        : msg.content;
+                      if (!display) return null;
+                      return (
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: renderContent(display),
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
                 )}
                 {msg.token_count && msg.role === "assistant" && (
