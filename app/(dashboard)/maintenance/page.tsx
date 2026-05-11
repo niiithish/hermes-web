@@ -2,6 +2,24 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { api } from '@/app/lib/api-client';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  RiRefreshLine,
+  RiDownloadLine,
+  RiHistoryLine,
+  RiStethoscopeLine,
+  RiFileCopyLine,
+  RiUploadLine,
+  RiArrowUpSLine,
+  RiCloseLine,
+  RiCheckLine,
+  RiArrowRightLine,
+} from '@remixicon/react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,408 +142,6 @@ function parseDoctorOutput(raw: string): DoctorParsed {
   return { sections, totalPass, totalFail, totalWarn };
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = {
-  container: {
-    padding: '24px',
-    height: '100%',
-    overflowY: 'auto',
-  } as React.CSSProperties,
-
-  pageHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '16px',
-  } as React.CSSProperties,
-
-  pageTitle: {
-    fontSize: '20px',
-    fontWeight: 700,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    color: 'var(--fg)',
-  } as React.CSSProperties,
-
-  pageSubtitle: {
-    fontSize: '13px',
-    color: 'var(--fg-muted)',
-    marginTop: '4px',
-  } as React.CSSProperties,
-
-  cardGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '16px',
-    marginBottom: '16px',
-  } as React.CSSProperties,
-
-  card: {
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius, 6px)',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-  } as React.CSSProperties,
-
-  cardTitle: {
-    fontSize: '12px',
-    fontWeight: 600,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    color: 'var(--fg-muted)',
-    marginBottom: '12px',
-  } as React.CSSProperties,
-
-  cardActions: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
-    marginTop: 'auto',
-    paddingTop: '12px',
-  } as React.CSSProperties,
-
-  btnGhost: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    padding: '6px 14px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius, 6px)',
-    background: 'var(--bg-panel)',
-    color: 'var(--fg)',
-    fontFamily: 'var(--font, monospace)',
-    fontSize: '12px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-  } as React.CSSProperties,
-
-  btnPrimary: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    padding: '6px 14px',
-    border: 'none',
-    borderRadius: 'var(--radius, 6px)',
-    background: 'var(--accent)',
-    color: '#fff',
-    fontFamily: 'var(--font, monospace)',
-    fontSize: '12px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-  } as React.CSSProperties,
-
-  btnSm: {
-    padding: '3px 8px',
-    fontSize: '11px',
-  } as React.CSSProperties,
-
-  btnOutline: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    padding: '6px 14px',
-    border: '1px solid var(--accent)',
-    borderRadius: 'var(--radius, 6px)',
-    background: 'transparent',
-    color: 'var(--accent)',
-    fontFamily: 'var(--font, monospace)',
-    fontSize: '12px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-  } as React.CSSProperties,
-
-  statRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '4px 0',
-    borderBottom: '1px solid var(--border)',
-  } as React.CSSProperties,
-
-  statRowLast: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '4px 0',
-  } as React.CSSProperties,
-
-  statLabel: {
-    fontSize: '12px',
-    color: 'var(--fg-muted)',
-  } as React.CSSProperties,
-
-  statValue: {
-    fontSize: '12px',
-    fontWeight: 500,
-    color: 'var(--fg)',
-    textAlign: 'right',
-  } as React.CSSProperties,
-
-  statValueMono: {
-    fontSize: '11px',
-    fontWeight: 500,
-    color: 'var(--fg)',
-    textAlign: 'right',
-    fontFamily: 'var(--font-mono, monospace)',
-  } as React.CSSProperties,
-
-  statItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-  } as React.CSSProperties,
-
-  badge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '2px 6px',
-    fontSize: '10px',
-    fontWeight: 600,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    borderRadius: '4px',
-    border: '1px solid var(--border)',
-  } as React.CSSProperties,
-
-  badgeWarning: {
-    background: 'rgba(255,172,2,0.15)',
-    color: 'var(--warning, #eab308)',
-    borderColor: 'var(--warning, #eab308)',
-  } as React.CSSProperties,
-
-  statusOk: {
-    color: 'var(--success, #22c55e)',
-  } as React.CSSProperties,
-
-  statusFail: {
-    color: 'var(--danger, #ef4444)',
-  } as React.CSSProperties,
-
-  statusWarn: {
-    color: 'var(--warning, #eab308)',
-  } as React.CSSProperties,
-
-  latencyText: {
-    fontSize: '10px',
-    opacity: 0.6,
-  } as React.CSSProperties,
-
-  // Version info grid
-  versionGrid: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '12px',
-    marginBottom: '12px',
-  } as React.CSSProperties,
-
-  // Doctor output
-  doctorSummary: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    alignItems: 'center',
-    padding: '8px 10px',
-    background: 'var(--bg-input)',
-    borderRadius: 'var(--radius, 6px)',
-    marginBottom: '8px',
-    fontSize: '12px',
-  } as React.CSSProperties,
-
-  doctorSummaryItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontWeight: 600,
-  } as React.CSSProperties,
-
-  doctorSection: {
-    marginBottom: '6px',
-  } as React.CSSProperties,
-
-  doctorSectionHeader: {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: 'var(--fg)',
-    padding: '4px 0',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  } as React.CSSProperties,
-
-  doctorItem: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '6px',
-    padding: '2px 0',
-    paddingLeft: '12px',
-    fontSize: '11px',
-  } as React.CSSProperties,
-
-  doctorItemText: {
-    color: 'var(--fg-muted)',
-    flex: 1,
-  } as React.CSSProperties,
-
-  doctorSuggestion: {
-    fontSize: '11px',
-    color: 'var(--fg-subtle)',
-    fontStyle: 'italic',
-    paddingLeft: '30px',
-    paddingBottom: '4px',
-  } as React.CSSProperties,
-
-  // Pre formatted output
-  preOutput: {
-    fontSize: '10px',
-    whiteSpace: 'pre-wrap',
-    maxHeight: '300px',
-    overflowY: 'auto',
-    color: 'var(--fg-muted)',
-    fontFamily: 'var(--font-mono, monospace)',
-    background: 'var(--bg-input)',
-    padding: '8px',
-    borderRadius: 'var(--radius, 6px)',
-  } as React.CSSProperties,
-
-  // Loading
-  loading: {
-    fontSize: '12px',
-    color: 'var(--fg-muted)',
-    fontStyle: 'italic',
-    padding: '8px 0',
-  } as React.CSSProperties,
-
-  // Error
-  errorMsg: {
-    fontSize: '12px',
-    color: 'var(--danger, #ef4444)',
-    padding: '8px 0',
-  } as React.CSSProperties,
-
-  // All OK
-  allOk: {
-    marginTop: '8px',
-    fontSize: '11px',
-    color: 'var(--fg-muted)',
-  } as React.CSSProperties,
-
-  // Modal
-  modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(0,0,0,0.6)',
-    zIndex: 999,
-  } as React.CSSProperties,
-
-  modalCard: {
-    background: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg, 12px)',
-    padding: '24px',
-    minWidth: '360px',
-    maxWidth: '90vw',
-    maxHeight: '85vh',
-    overflowY: 'auto',
-    boxShadow: 'var(--shadow)',
-  } as React.CSSProperties,
-
-  modalTitle: {
-    fontSize: '16px',
-    fontWeight: 600,
-    marginBottom: '16px',
-    color: 'var(--fg-base)',
-  } as React.CSSProperties,
-
-  modalMessage: {
-    fontSize: '13px',
-    color: 'var(--fg-muted)',
-    marginBottom: '16px',
-    whiteSpace: 'pre-wrap',
-  } as React.CSSProperties,
-
-  modalActions: {
-    display: 'flex',
-    gap: '8px',
-    justifyContent: 'flex-end',
-  } as React.CSSProperties,
-
-  // Commit card in modal
-  commitCard: {
-    padding: '8px 10px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius, 6px)',
-    marginBottom: '6px',
-    background: 'var(--bg-input)',
-  } as React.CSSProperties,
-
-  commitHash: {
-    fontFamily: 'var(--font-mono, monospace)',
-    fontSize: '11px',
-    color: 'var(--accent)',
-    marginRight: '8px',
-  } as React.CSSProperties,
-
-  // Toast
-  toastBase: {
-    position: 'fixed',
-    bottom: '24px',
-    right: '24px',
-    padding: '10px 20px',
-    borderRadius: 'var(--radius, 6px)',
-    fontSize: '13px',
-    fontWeight: 500,
-    zIndex: 1000,
-  } as React.CSSProperties,
-
-  // File input label (styled as button)
-  fileLabel: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    padding: '6px 14px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius, 6px)',
-    background: 'var(--bg-panel)',
-    color: 'var(--fg)',
-    fontFamily: 'var(--font, monospace)',
-    fontSize: '12px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-  } as React.CSSProperties,
-
-  // SSE log
-  sseLog: {
-    fontFamily: 'var(--font-mono, monospace)',
-    fontSize: '12px',
-    lineHeight: 1.8,
-    maxHeight: '400px',
-    overflowY: 'auto',
-    background: 'var(--bg-input)',
-    padding: '12px',
-    borderRadius: 'var(--radius, 6px)',
-    whiteSpace: 'pre-wrap',
-    color: 'var(--fg-muted)',
-  } as React.CSSProperties,
-};
-
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function MaintenancePage() {
@@ -559,6 +175,7 @@ export default function MaintenancePage() {
   // ── Modal state ─────────────────────────────────────────────────────────────
   const confirmResolveRef = useRef<((v: boolean) => void) | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; title: string } | null>(null);
+  const [commitListData, setCommitListData] = useState<HCIUpdateInfo | null>(null);
   const [diffModal, setDiffModal] = useState<CommitDiff | null>(null);
   const [sseModal, setSseModal] = useState<{ title: string; log: string; completed: boolean } | null>(null);
 
@@ -666,7 +283,6 @@ export default function MaintenancePage() {
       }
       setHciInfo(res);
       if (res.behind > 0) {
-        setDiffModal(null); // We'll show commits in a modal-like view
         showCommitListModal(res);
       } else {
         showToast(`Already at latest commit on ${res.branch}`, 'info');
@@ -679,16 +295,8 @@ export default function MaintenancePage() {
   }, [showToast]);
 
   const showCommitListModal = useCallback((data: HCIUpdateInfo) => {
-    setSseModal(null); // clear any existing
-    // Reuse the confirm dialog infrastructure but customize the message
-    confirmResolveRef.current = (v: boolean) => {
-      confirmResolveRef.current = null;
-      setConfirmDialog(null);
-    };
-    setConfirmDialog({
-      title: `${data.behind} commit(s) behind on ${data.branch}`,
-      message: '__COMMIT_LIST__' + JSON.stringify(data.commits),
-    });
+    setSseModal(null);
+    setCommitListData(data);
   }, []);
 
   const showCommitDiffModal = useCallback(async (hash: string) => {
@@ -764,8 +372,7 @@ export default function MaintenancePage() {
   }, [confirm, runSSEUpdate]);
 
   const checkoutCommit = useCallback(async (hash: string) => {
-    setConfirmDialog(null);
-    confirmResolveRef.current = null;
+    setCommitListData(null);
     const ok = await confirm(`Checkout to ${hash}? This will run npm install and rebuild.\n\nThe server will restart.`, 'Checkout Commit');
     if (!ok) return;
     runSSEUpdate(`/api/hci/update/commit/${hash}`, `Checkout ${hash}`);
@@ -1047,23 +654,23 @@ export default function MaintenancePage() {
     if (!sections.length) return null;
 
     return (
-      <div style={{ marginTop: '8px' }}>
+      <div className="mt-2">
         {/* Summary bar */}
-        <div style={styles.doctorSummary}>
-          <div style={{ ...styles.doctorSummaryItem, color: 'var(--success, #22c55e)' }}>
+        <div className="flex flex-wrap gap-2 items-center px-2.5 py-2 bg-muted rounded-md mb-2 text-xs">
+          <div className="flex items-center gap-1 font-semibold text-green-500">
             <span>✓</span> {totalPass} passed
           </div>
           {totalWarn > 0 && (
-            <div style={{ ...styles.doctorSummaryItem, color: 'var(--warning, #eab308)' }}>
+            <div className="flex items-center gap-1 font-semibold text-yellow-500">
               <span>⚠</span> {totalWarn} warnings
             </div>
           )}
           {totalFail > 0 && (
-            <div style={{ ...styles.doctorSummaryItem, color: 'var(--danger, #ef4444)' }}>
+            <div className="flex items-center gap-1 font-semibold text-red-500">
               <span>✗</span> {totalFail} failed
             </div>
           )}
-          <div style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--fg-muted)' }}>
+          <div className="ml-auto text-[11px] text-muted-foreground">
             {total} checks
           </div>
         </div>
@@ -1075,36 +682,38 @@ export default function MaintenancePage() {
           const secStatus = hasFail ? 'fail' : hasWarn ? 'warn' : 'pass';
           const secColor =
             secStatus === 'fail'
-              ? 'var(--danger, #ef4444)'
+              ? 'text-red-500'
               : secStatus === 'warn'
-                ? 'var(--warning, #eab308)'
-                : 'var(--success, #22c55e)';
+                ? 'text-yellow-500'
+                : 'text-green-500';
           const secIcon = secStatus === 'fail' ? '✗' : secStatus === 'warn' ? '⚠' : '✓';
 
           return (
-            <div key={si} style={styles.doctorSection}>
-              <div style={styles.doctorSectionHeader}>
-                <span style={{ color: secColor }}>{secIcon}</span>
+            <div key={si} className="mb-1.5">
+              <div className="text-xs font-semibold flex items-center gap-1.5 py-1">
+                <span className={secColor}>{secIcon}</span>
                 {sec.name}
               </div>
               {sec.items.map((item, ii) => (
                 <div key={ii}>
-                  <div style={styles.doctorItem}>
-                    <span style={{
-                      color:
+                  <div className="flex items-start gap-1.5 py-0.5 pl-3 text-[11px]">
+                    <span
+                      className={`shrink-0 ${
                         item.status === 'pass'
-                          ? 'var(--success, #22c55e)'
+                          ? 'text-green-500'
                           : item.status === 'fail'
-                            ? 'var(--danger, #ef4444)'
-                            : 'var(--warning, #eab308)',
-                      flexShrink: 0,
-                    }}>
+                            ? 'text-red-500'
+                            : 'text-yellow-500'
+                      }`}
+                    >
                       {item.status === 'pass' ? '✓' : item.status === 'fail' ? '✗' : '⚠'}
                     </span>
-                    <span style={styles.doctorItemText}>{item.text}</span>
+                    <span className="text-muted-foreground flex-1">{item.text}</span>
                   </div>
                   {item.suggestion && (
-                    <div style={styles.doctorSuggestion}>→ {item.suggestion}</div>
+                    <div className="text-[11px] italic text-muted-foreground/70 pl-[30px] pb-1">
+                      → {item.suggestion}
+                    </div>
                   )}
                 </div>
               ))}
@@ -1126,223 +735,273 @@ export default function MaintenancePage() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div style={styles.container}>
+    <div className="h-full overflow-y-auto p-6">
       {/* Page Header */}
-      <div style={styles.pageHeader}>
+      <div className="flex justify-between items-start mb-4">
         <div>
-          <div style={styles.pageTitle}>Maintenance</div>
-          <div style={styles.pageSubtitle}>System maintenance, updates, backups, and diagnostics</div>
+          <h1 className="text-xl font-bold tracking-wider uppercase">Maintenance</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            System maintenance, updates, backups, and diagnostics
+          </p>
         </div>
       </div>
 
       {/* ===== Card Grid ===== */}
-      <div style={styles.cardGrid}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* ── Health Check Card ── */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Health Check</div>
-          {healthResults ? (
-            <div style={{ flex: 1 }}>
-              {healthResults.map((r, i) => (
-                <div
-                  key={i}
-                  style={
-                    i < healthResults.length - 1 ? styles.statRow : styles.statRowLast
-                  }
-                >
-                  <span style={styles.statLabel}>{r.name}</span>
-                  <span style={styles.statValue}>
-                    <span style={r.ok ? styles.statusOk : styles.statusFail}>
-                      {r.ok ? '● OK' : '○ FAIL'}
-                    </span>{' '}
-                    <span style={styles.latencyText}>{r.ms}ms</span>
-                  </span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Health Check</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            {healthResults ? (
+              <div>
+                {healthResults.map((r, i) => (
+                  <div
+                    key={i}
+                    className={`flex justify-between items-center py-1 ${
+                      i < healthResults.length - 1 ? 'border-b border-border' : ''
+                    }`}
+                  >
+                    <span className="text-xs text-muted-foreground">{r.name}</span>
+                    <span className="text-xs font-medium text-right">
+                      <span className={r.ok ? 'text-green-500' : 'text-red-500'}>
+                        {r.ok ? '● OK' : '○ FAIL'}
+                      </span>{' '}
+                      <span className="text-[10px] opacity-60">{r.ms}ms</span>
+                    </span>
+                  </div>
+                ))}
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  {healthResults.every((r) => r.ok)
+                    ? 'All endpoints healthy'
+                    : 'Some endpoints failed'}
                 </div>
-              ))}
-              <div style={styles.allOk}>
-                {healthResults.every((r) => r.ok)
-                  ? 'All endpoints healthy'
-                  : 'Some endpoints failed'}
               </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '12px', color: 'var(--fg-muted)', marginBottom: '8px', flex: 1 }}>
-              Test all HCI API endpoints
-            </div>
-          )}
-          <div style={styles.cardActions}>
-            <button
-              style={{ ...styles.btnGhost }}
+            ) : (
+              <div className="text-xs text-muted-foreground mb-2">
+                Test all HCI API endpoints
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={runHealthCheck}
               disabled={healthRunning}
             >
+              <RiStethoscopeLine />
               {healthRunning ? 'Testing...' : 'Check APIs'}
-            </button>
-            <button
-              style={{ ...styles.btnGhost }}
-              onClick={restartHCI}
-            >
+            </Button>
+            <Button variant="outline" size="sm" onClick={restartHCI}>
+              <RiRefreshLine />
               Restart HCI
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
 
         {/* ── HCI Update Card ── */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>HCI Update</div>
-          <div style={styles.versionGrid}>
-            <div style={styles.statItem}>
-              <span style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>Version</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg)' }}>
-                {hciInfo?.local?.version || '—'}
-              </span>
-            </div>
-            <div style={styles.statItem}>
-              <span style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>Commit</span>
-              <code style={{ fontSize: '11px', color: 'var(--accent)' }}>
-                {hciInfo?.local?.hash || '—'}
-              </code>
-            </div>
-            <div style={styles.statItem}>
-              <span style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>Branch</span>
-              <code style={{ fontSize: '11px', color: 'var(--fg)' }}>
-                {hciInfo?.branch || '—'}
-              </code>
-            </div>
-            {(hciInfo?.behind ?? 0) > 0 && (
-              <div style={styles.statItem}>
-                <span style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>Behind</span>
-                <span style={{ ...styles.badge, ...styles.badgeWarning }}>
-                  {hciInfo?.behind}
+        <Card>
+          <CardHeader>
+            <CardTitle>HCI Update</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <div className="flex flex-wrap gap-3 mb-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground">Version</span>
+                <span className="text-xs font-semibold">
+                  {hciInfo?.local?.version || '—'}
                 </span>
               </div>
-            )}
-          </div>
-          <div style={styles.cardActions}>
-            <button
-              style={{ ...styles.btnPrimary, ...styles.btnSm }}
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground">Commit</span>
+                <code className="text-[11px] text-primary">
+                  {hciInfo?.local?.hash || '—'}
+                </code>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground">Branch</span>
+                <code className="text-[11px]">
+                  {hciInfo?.branch || '—'}
+                </code>
+              </div>
+              {(hciInfo?.behind ?? 0) > 0 && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground">Behind</span>
+                  <Badge
+                    variant="outline"
+                    className="bg-yellow-500/10 text-yellow-500 border-yellow-500"
+                  >
+                    {hciInfo?.behind}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="gap-2 flex-wrap">
+            <Button
+              variant="default"
+              size="sm"
               onClick={checkHCIUpdates}
               disabled={hciLoading}
             >
+              <RiRefreshLine />
               {hciLoading ? 'Checking...' : 'Check Updates'}
-            </button>
-            <button
-              style={{ ...styles.btnOutline, ...styles.btnSm }}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-primary text-primary hover:bg-primary/10"
               onClick={updateHCI}
             >
+              <RiDownloadLine />
               Update All
-            </button>
-            <button
-              style={{ ...styles.btnGhost, ...styles.btnSm }}
-              onClick={rollbackHCI}
-            >
+            </Button>
+            <Button variant="outline" size="sm" onClick={rollbackHCI}>
+              <RiHistoryLine />
               Rollback
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
 
         {/* ── Doctor Card ── */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Doctor</div>
-          {doctorRunning && (
-            <div style={styles.loading}>Running diagnostics...</div>
-          )}
-          {doctorParsed && !doctorRunning && (
-            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-              {renderDoctorOutput(doctorParsed)}
-            </div>
-          )}
-          {doctorResult && !doctorParsed && !doctorRunning && (
-            <pre style={styles.preOutput}>{doctorResult}</pre>
-          )}
-          <div style={styles.cardActions}>
-            <button
-              style={{ ...styles.btnGhost }}
+        <Card>
+          <CardHeader>
+            <CardTitle>Doctor</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 min-h-0">
+            {doctorRunning && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground italic py-2">
+                <Spinner className="size-3" />
+                Running diagnostics...
+              </div>
+            )}
+            {doctorParsed && !doctorRunning && (
+              <ScrollArea className="max-h-[500px]">
+                {renderDoctorOutput(doctorParsed)}
+              </ScrollArea>
+            )}
+            {doctorResult && !doctorParsed && !doctorRunning && (
+              <pre className="text-[10px] whitespace-pre-wrap max-h-[300px] overflow-y-auto text-muted-foreground font-mono bg-muted p-2 rounded-md">
+                {doctorResult}
+              </pre>
+            )}
+          </CardContent>
+          <CardFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={runDoctor}
               disabled={doctorRunning}
             >
+              <RiStethoscopeLine />
               {doctorRunning ? 'Running...' : 'Run Diagnose'}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
 
         {/* ── Dump Card ── */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Dump</div>
-          <div style={{ fontSize: '12px', color: 'var(--fg-muted)', marginBottom: '8px', flex: 1 }}>
-            Setup summary for debugging
-          </div>
-          {dumpLoading && <div style={styles.loading}>Generating dump...</div>}
-          {dumpResult && !dumpLoading && (
-            <pre style={styles.preOutput}>{dumpResult}</pre>
-          )}
-          <div style={styles.cardActions}>
-            <button
-              style={{ ...styles.btnGhost }}
+        <Card>
+          <CardHeader>
+            <CardTitle>Dump</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <div className="text-xs text-muted-foreground mb-2">
+              Setup summary for debugging
+            </div>
+            {dumpLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground italic py-2">
+                <Spinner className="size-3" />
+                Generating dump...
+              </div>
+            )}
+            {dumpResult && !dumpLoading && (
+              <pre className="text-[10px] whitespace-pre-wrap max-h-[300px] overflow-y-auto text-muted-foreground font-mono bg-muted p-2 rounded-md">
+                {dumpResult}
+              </pre>
+            )}
+          </CardContent>
+          <CardFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={runDump}
               disabled={dumpLoading}
             >
+              <RiFileCopyLine />
               {dumpLoading ? 'Generating...' : 'Generate Dump'}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
 
         {/* ── Hermes Update Card ── */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Hermes Update</div>
-          <div style={{
-            ...styles.statRow,
-            marginBottom: '8px',
-            background: 'var(--bg-input)',
-            padding: '8px 10px',
-            borderRadius: 'var(--radius, 6px)',
-            border: 'none',
-          }}>
-            <span style={styles.statLabel}>Version</span>
-            <span style={styles.statValue}>{hermesVersion}</span>
-          </div>
-          {updateResult && (
-            <pre style={{ ...styles.preOutput, maxHeight: '150px' }}>{updateResult}</pre>
-          )}
-          <div style={styles.cardActions}>
-            <button
-              style={{ ...styles.btnGhost }}
+        <Card>
+          <CardHeader>
+            <CardTitle>Hermes Update</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <div className="flex justify-between items-center py-2 px-2.5 bg-muted rounded-md mb-2">
+              <span className="text-xs text-muted-foreground">Version</span>
+              <span className="text-xs font-medium">{hermesVersion}</span>
+            </div>
+            {updateResult && (
+              <pre className="text-[10px] whitespace-pre-wrap max-h-[150px] overflow-y-auto text-muted-foreground font-mono bg-muted p-2 rounded-md">
+                {updateResult}
+              </pre>
+            )}
+          </CardContent>
+          <CardFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={updateHermes}
               disabled={updateRunning}
             >
+              <RiArrowUpSLine />
               {updateRunning ? 'Updating...' : 'Update Hermes'}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
 
         {/* ── Backup Card ── */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Backup &amp; Import</div>
-          <div style={{ fontSize: '12px', color: 'var(--fg-muted)', marginBottom: '10px', flex: 1 }}>
-            Create and restore Hermes data backups
-          </div>
-          {backupResult && (
-            <pre style={{ ...styles.preOutput, maxHeight: '150px' }}>{backupResult}</pre>
-          )}
-          <div style={styles.cardActions}>
-            <button
-              style={{ ...styles.btnGhost }}
+        <Card>
+          <CardHeader>
+            <CardTitle>Backup &amp; Import</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <div className="text-xs text-muted-foreground mb-2.5">
+              Create and restore Hermes data backups
+            </div>
+            {backupResult && (
+              <pre className="text-[10px] whitespace-pre-wrap max-h-[150px] overflow-y-auto text-muted-foreground font-mono bg-muted p-2 rounded-md">
+                {backupResult}
+              </pre>
+            )}
+          </CardContent>
+          <CardFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={createBackup}
               disabled={backupLoading}
             >
+              <RiUploadLine />
               {backupLoading ? 'Creating...' : 'Create Backup'}
-            </button>
-            <label style={styles.fileLabel}>
+            </Button>
+            <label className="inline-flex items-center justify-center gap-1.5 h-6 px-2 text-xs font-medium rounded-md border border-border bg-background cursor-pointer transition-all whitespace-nowrap hover:bg-muted">
+              <RiDownloadLine className="size-3" />
               {importLoading ? 'Importing...' : 'Import'}
               <input
                 type="file"
                 accept=".zip"
-                style={{ display: 'none' }}
+                className="hidden"
                 onChange={(e) => importBackup(e.target)}
                 disabled={importLoading}
               />
             </label>
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
@@ -1350,134 +1009,178 @@ export default function MaintenancePage() {
           ══════════════════════════════════════════════════════════════════ */}
 
       {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div style={styles.modalOverlay} onClick={handleConfirmNo}>
-          <div style={{ ...styles.modalCard, width: confirmDialog.message.startsWith('__COMMIT_LIST__') ? '600px' : '380px' }}>
-            <div style={styles.modalTitle}>{confirmDialog.title}</div>
+      <Dialog
+        open={confirmDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) handleConfirmNo();
+        }}
+      >
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>{confirmDialog?.title}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs/relaxed text-muted-foreground whitespace-pre-wrap">
+            {confirmDialog?.message}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleConfirmNo}>
+              <RiCloseLine />
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmYes}>
+              <RiCheckLine />
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            {confirmDialog.message.startsWith('__COMMIT_LIST__') ? (
-              /* Commit list modal */
+      {/* Commit List Dialog */}
+      <Dialog
+        open={commitListData !== null}
+        onOpenChange={(open) => {
+          if (!open) setCommitListData(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              {commitListData && `${commitListData.behind} commit(s) behind on ${commitListData.branch}`}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            {commitListData && (
               <div>
-                {(() => {
-                  const commits: HCIUpdateInfo['commits'] = JSON.parse(confirmDialog.message.slice('__COMMIT_LIST__'.length));
-                  return (
-                    <>
-                      {commits.map((c) => (
-                        <div key={c.hash} style={styles.commitCard}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <code style={styles.commitHash}>{c.shortHash}</code>
-                            <span style={{ flex: 1, fontWeight: 600, fontSize: '13px', color: 'var(--fg)' }}>
-                              {escapeHtml(c.msg)}
-                            </span>
-                            <button
-                              style={{ ...styles.btnGhost, ...styles.btnSm }}
-                              onClick={() => showCommitDiffModal(c.shortHash)}
-                            >
-                              Diff
-                            </button>
-                            <button
-                              style={{ ...styles.btnPrimary, ...styles.btnSm }}
-                              onClick={() => checkoutCommit(c.shortHash)}
-                            >
-                              Checkout
-                            </button>
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>
-                            {escapeHtml(c.author)} · {formatRelativeTime(c.date)}
-                          </div>
-                        </div>
-                      ))}
-                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                        <button
-                          style={{ ...styles.btnPrimary }}
-                          onClick={() => { handleConfirmNo(); updateHCI(); }}
-                        >
-                          Update All (pull latest)
-                        </button>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            ) : (
-              <div style={styles.modalMessage}>{confirmDialog.message}</div>
-            )}
-
-            {!confirmDialog.message.startsWith('__COMMIT_LIST__') && (
-              <div style={styles.modalActions}>
-                <button style={styles.btnGhost} onClick={handleConfirmNo}>Cancel</button>
-                <button style={styles.btnPrimary} onClick={handleConfirmYes}>Confirm</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Commit Diff Modal */}
-      {diffModal && (
-        <div style={styles.modalOverlay} onClick={() => setDiffModal(null)}>
-          <div style={{ ...styles.modalCard, maxWidth: '700px' }}>
-            <div style={styles.modalTitle}>
-              {diffModal.commit.shortHash}: {diffModal.commit.msg}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--fg-muted)', marginBottom: '8px' }}>
-              {diffModal.commit.author} · {formatRelativeTime(diffModal.commit.date)}
-            </div>
-            <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '8px' }}>
-              {diffModal.shortstat}
-            </div>
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {diffModal.files.map((f, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '12px', padding: '2px 0' }}>
-                  <span style={{ color: 'var(--success, #22c55e)' }}>+{f.added}</span>
-                  <span style={{ color: 'var(--danger, #ef4444)' }}>-{f.removed}</span>
-                  <span style={{
-                    flex: 1,
-                    fontFamily: 'var(--font-mono, monospace)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
-                    {f.file}
-                  </span>
+                {commitListData.commits.map((c) => (
+                  <div
+                    key={c.hash}
+                    className="p-2.5 border border-border rounded-md mb-1.5 bg-muted"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <code className="font-mono text-[11px] text-primary mr-2">
+                        {c.shortHash}
+                      </code>
+                      <span className="flex-1 font-semibold text-sm">
+                        {escapeHtml(c.msg)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => showCommitDiffModal(c.shortHash)}
+                      >
+                        <RiFileCopyLine />
+                        Diff
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => checkoutCommit(c.shortHash)}
+                      >
+                        <RiArrowRightLine />
+                        Checkout
+                      </Button>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {escapeHtml(c.author)} · {formatRelativeTime(c.date)}
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-3 pt-3 border-t border-border">
+                  <Button
+                    onClick={() => {
+                      setCommitListData(null);
+                      updateHCI();
+                    }}
+                  >
+                    <RiDownloadLine />
+                    Update All (pull latest)
+                  </Button>
                 </div>
-              ))}
-            </div>
-            <div style={{ ...styles.modalActions, marginTop: '16px' }}>
-              <button style={styles.btnGhost} onClick={() => setDiffModal(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
-      {/* SSE Progress Modal */}
-      {sseModal && (
-        <div style={styles.modalOverlay} onClick={() => sseModal.completed && setSseModal(null)}>
-          <div style={{ ...styles.modalCard, maxWidth: '600px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ ...styles.modalTitle, marginBottom: 0 }}>{sseModal.title}</div>
-              {sseModal.completed && (
-                <button
-                  style={{ ...styles.btnGhost, ...styles.btnSm }}
-                  onClick={() => setSseModal(null)}
-                >
-                  Close
-                </button>
-              )}
-            </div>
-            <pre style={styles.sseLog}>
-              {sseModal.log || 'Starting...'}
-            </pre>
-          </div>
-        </div>
-      )}
+      {/* Commit Diff Dialog */}
+      <Dialog
+        open={diffModal !== null}
+        onOpenChange={(open) => {
+          if (!open) setDiffModal(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>
+              {diffModal && `${diffModal.commit.shortHash}: ${diffModal.commit.msg}`}
+            </DialogTitle>
+          </DialogHeader>
+          {diffModal && (
+            <>
+              <div className="text-xs text-muted-foreground mb-2">
+                {diffModal.commit.author} · {formatRelativeTime(diffModal.commit.date)}
+              </div>
+              <div className="font-semibold text-xs mb-2">{diffModal.shortstat}</div>
+              <ScrollArea className="max-h-[400px]">
+                {diffModal.files.map((f, i) => (
+                  <div key={i} className="flex gap-2 text-xs py-0.5">
+                    <span className="text-green-500">+{f.added}</span>
+                    <span className="text-red-500">-{f.removed}</span>
+                    <span className="flex-1 font-mono overflow-hidden text-ellipsis whitespace-nowrap">
+                      {f.file}
+                    </span>
+                  </div>
+                ))}
+              </ScrollArea>
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiffModal(null)}>
+              <RiCloseLine />
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SSE Progress Dialog */}
+      <Dialog
+        open={sseModal !== null}
+        onOpenChange={(open) => {
+          if (!open && sseModal?.completed) setSseModal(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader className="flex flex-row justify-between items-center w-full">
+            <DialogTitle>{sseModal?.title}</DialogTitle>
+            {sseModal?.completed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSseModal(null)}
+              >
+                <RiCloseLine />
+                Close
+              </Button>
+            )}
+          </DialogHeader>
+          <pre className="font-mono text-xs leading-relaxed max-h-[400px] overflow-y-auto bg-muted p-3 rounded-md whitespace-pre-wrap text-muted-foreground">
+            {sseModal?.log || 'Starting...'}
+          </pre>
+        </DialogContent>
+      </Dialog>
 
       {/* Toast */}
       {toast && (
-        <div style={{
-          ...styles.toastBase,
-          background: toast.type === 'success' ? 'var(--success, #22c55e)' : toast.type === 'error' ? 'var(--danger, #ef4444)' : 'var(--accent)',
-          color: '#fff',
-        }}>
+        <div
+          className={`fixed bottom-6 right-6 px-5 py-2.5 rounded-md text-sm font-medium z-[1000] text-white ${
+            toast.type === 'success'
+              ? 'bg-green-500'
+              : toast.type === 'error'
+                ? 'bg-red-500'
+                : 'bg-primary'
+          }`}
+        >
           {toast.message}
         </div>
       )}

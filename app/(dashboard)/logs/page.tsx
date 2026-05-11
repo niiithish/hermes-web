@@ -2,6 +2,25 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '@/app/lib/api-client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Empty, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  RiRefreshLine,
+  RiFileCopyLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiArrowDownLine,
+} from '@remixicon/react';
 
 // ============================================
 // Constants (mirrored from main.js)
@@ -16,23 +35,39 @@ const LEVEL_MAP: Record<string, string> = {
   user: 'USR',
 };
 
-const LEVEL_COLORS: Record<string, string> = {
-  INF: 'var(--fg-muted)',
-  DBG: 'var(--fg-subtle)',
-  ERR: 'var(--red, #c45c5c)',
-  WRN: 'var(--amber, #c4a44c)',
-  SYS: 'var(--teal, #4ecdc4)',
-  USR: 'var(--purple, #a78bfa)',
+const LEVEL_COLOR_CLASSES: Record<string, string> = {
+  INF: 'text-muted-foreground',
+  DBG: 'text-muted-foreground/50',
+  ERR: 'text-red-500 dark:text-red-400',
+  WRN: 'text-amber-500 dark:text-amber-400',
+  SYS: 'text-teal-400 dark:text-teal-300',
+  USR: 'text-purple-400 dark:text-purple-300',
 };
 
 const TYPE_OPTIONS = [
   { value: '', label: 'ALL', color: undefined as string | undefined },
-  { value: 'QC', label: 'QC', color: '#a78bfa' },
-  { value: 'ALERT', label: 'ALERT', color: '#ff6b6b' },
-  { value: 'TASK', label: 'TASK', color: '#4ecdc4' },
-  { value: 'TOOL', label: 'TOOL', color: '#60a5fa' },
-  { value: 'MCP', label: 'MCP', color: '#fb923c' },
+  { value: 'QC', label: 'QC', color: 'text-purple-400' },
+  { value: 'ALERT', label: 'ALERT', color: 'text-red-500' },
+  { value: 'TASK', label: 'TASK', color: 'text-teal-400' },
+  { value: 'TOOL', label: 'TOOL', color: 'text-blue-400' },
+  { value: 'MCP', label: 'MCP', color: 'text-orange-400' },
 ] as const;
+
+const TYPE_COLOR_CLASSES: Record<string, string> = {
+  QC: 'text-purple-400',
+  ALERT: 'text-red-500',
+  TASK: 'text-teal-400',
+  TOOL: 'text-blue-400',
+  MCP: 'text-orange-400',
+};
+
+const TYPE_BG_CLASSES: Record<string, string> = {
+  QC: 'bg-purple-400/15',
+  ALERT: 'bg-red-500/15',
+  TASK: 'bg-teal-400/15',
+  TOOL: 'bg-blue-400/15',
+  MCP: 'bg-orange-400/15',
+};
 
 const TYPE_KEYWORDS: Record<string, string[]> = {
   QC: ['quality', 'score', 'eval'],
@@ -105,226 +140,6 @@ interface LogsResponse {
 }
 
 // ============================================
-// Styles (inline custom properties)
-// ============================================
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    padding: '12px 16px',
-    overflow: 'hidden',
-  } as React.CSSProperties,
-
-  filterBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    flexWrap: 'wrap' as const,
-    padding: '8px 0',
-    borderBottom: '1px solid var(--border)',
-    marginBottom: '8px',
-    minHeight: '40px',
-  } as React.CSSProperties,
-
-  filterGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  } as React.CSSProperties,
-
-  filterLabel: {
-    fontSize: '11px',
-    color: 'var(--fg-muted)',
-  } as React.CSSProperties,
-
-  select: {
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius, 6px)',
-    color: 'var(--fg)',
-    fontFamily: 'var(--font, monospace)',
-    fontSize: '12px',
-    padding: '4px 8px',
-    outline: 'none',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  searchInput: {
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius, 6px)',
-    color: 'var(--fg)',
-    fontFamily: 'var(--font, monospace)',
-    fontSize: '12px',
-    padding: '4px 8px',
-    outline: 'none',
-    width: '140px',
-  } as React.CSSProperties,
-
-  toggleBtn: (active: boolean, color?: string): React.CSSProperties => ({
-    padding: '3px 8px',
-    fontSize: '11px',
-    fontFamily: 'var(--font, monospace)',
-    fontWeight: 600,
-    background: active ? 'var(--bg-panel-hover)' : 'var(--bg-panel)',
-    color: active ? (color || 'var(--fg)') : 'var(--fg-muted)',
-    border: `1px solid ${active ? 'var(--border-strong)' : 'var(--border)'}`,
-    borderRadius: 'var(--radius, 6px)',
-    cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s',
-    whiteSpace: 'nowrap' as const,
-  }),
-
-  iconBtn: (active?: boolean): React.CSSProperties => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '4px 10px',
-    fontSize: '13px',
-    fontFamily: 'var(--font, monospace)',
-    background: active ? 'var(--bg-panel-hover)' : 'var(--bg-panel)',
-    color: active ? 'var(--accent)' : 'var(--fg)',
-    border: `1px solid ${active ? 'var(--border-strong)' : 'var(--border)'}`,
-    borderRadius: 'var(--radius, 6px)',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-    whiteSpace: 'nowrap' as const,
-  }),
-
-  componentBar: {
-    display: 'flex' as const,
-    alignItems: 'center',
-    gap: '6px',
-    marginBottom: '6px',
-    padding: '4px 8px',
-    background: 'var(--bg-inset, var(--bg-input))',
-    borderRadius: 'var(--radius, 6px)',
-    fontSize: '11px',
-  },
-
-  logPanel: {
-    flex: 1,
-    overflowY: 'auto' as const,
-    fontFamily: 'var(--font-mono, var(--font, monospace))',
-    fontSize: '12px',
-    lineHeight: '1.7',
-    position: 'relative' as const,
-  },
-
-  logLine: (shortLvl: string): React.CSSProperties => ({
-    display: 'flex',
-    alignItems: 'baseline',
-    padding: '1px 4px',
-    borderRadius: '3px',
-    backgroundColor:
-      shortLvl === 'ERR'
-        ? 'rgba(255,107,107,0.06)'
-        : shortLvl === 'WRN'
-          ? 'rgba(255,172,2,0.04)'
-          : 'transparent',
-  }),
-
-  logTimestamp: {
-    color: 'var(--fg-subtle)',
-    userSelect: 'none' as const,
-    minWidth: '70px',
-    flexShrink: 0,
-  } as React.CSSProperties,
-
-  logLevel: (shortLvl: string): React.CSSProperties => ({
-    color: LEVEL_COLORS[shortLvl] || 'var(--fg-muted)',
-    minWidth: '32px',
-    textAlign: 'center' as const,
-    fontWeight: 600,
-    userSelect: 'none' as const,
-    flexShrink: 0,
-  }),
-
-  logMessage: {
-    flex: 1,
-    wordBreak: 'break-all' as const,
-  } as React.CSSProperties,
-
-  duplicateBadge: {
-    color: 'var(--coral, #ff6b6b)',
-    fontWeight: 700,
-    marginLeft: '4px',
-    flexShrink: 0,
-  } as React.CSSProperties,
-
-  copyIcon: {
-    cursor: 'pointer',
-    opacity: 0,
-    color: 'var(--fg-muted)',
-    marginLeft: '6px',
-    transition: 'opacity 0.15s',
-    flexShrink: 0,
-    userSelect: 'none' as const,
-  } as React.CSSProperties,
-
-  copyIconVisible: {
-    opacity: 1,
-  } as React.CSSProperties,
-
-  componentTag: {
-    cursor: 'pointer',
-    color: 'var(--teal, #4ecdc4)',
-    textDecoration: 'none' as const,
-    marginRight: '4px',
-    flexShrink: 0,
-  } as React.CSSProperties,
-
-  typeBadge: (color: string): React.CSSProperties => ({
-    color,
-    fontWeight: 600,
-    fontSize: '10px',
-    letterSpacing: '0.3px',
-    background: `${color}18`,
-    padding: '0 4px',
-    borderRadius: '3px',
-    marginLeft: '4px',
-    cursor: 'pointer',
-    flexShrink: 0,
-  }),
-
-  jumpBtn: {
-    position: 'fixed' as const,
-    bottom: '80px',
-    right: '24px',
-    zIndex: 100,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-    padding: '6px 14px',
-    fontSize: '12px',
-    fontFamily: 'var(--font, monospace)',
-    background: 'var(--accent)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 'var(--radius, 6px)',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  statsBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '6px 0',
-    fontSize: '11px',
-    color: 'var(--fg-muted)',
-    borderTop: '1px solid var(--border)',
-    marginTop: '8px',
-    flexWrap: 'wrap' as const,
-  } as React.CSSProperties,
-
-  emptyState: {
-    padding: '40px',
-    textAlign: 'center' as const,
-    color: 'var(--fg-subtle)',
-  } as React.CSSProperties,
-};
-
-// ============================================
 // LogsPage Component
 // ============================================
 
@@ -351,6 +166,10 @@ export default function LogsPage() {
   const panelRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Derived toggle-group values as string[]
+  const levelToggleValue: string[] = level ? [level] : [];
+  const typeToggleValue: string[] = type ? [type] : [];
 
   // --- Fetch logs ---
   const fetchLogs = useCallback(async () => {
@@ -464,7 +283,7 @@ export default function LogsPage() {
     const text = Array.from(lineEl.childNodes)
       .map((n) => n.textContent || '')
       .join('')
-      .replace('⧉', '')
+      .replace('\u29C9', '')
       .trim();
     try {
       await navigator.clipboard.writeText(text);
@@ -527,15 +346,17 @@ export default function LogsPage() {
 
   // --- Derived: type badge info for each entry ---
   const typeInfoMap = useMemo(() => {
-    const map = new Map<string, { type: string; color: string } | null>();
+    const map = new Map<string, { type: string; colorClass: string } | null>();
     const cacheKey = (m: string | undefined) => m || '';
     aggregated.forEach((e) => {
       const key = cacheKey(e.message);
       if (!map.has(key)) {
         const entryType = detectLogType(e.message);
         if (entryType) {
-          const opt = TYPE_OPTIONS.find((t) => t.value === entryType);
-          map.set(key, { type: entryType, color: opt && 'color' in opt && opt.color ? opt.color : 'var(--fg-muted)' });
+          map.set(key, {
+            type: entryType,
+            colorClass: TYPE_COLOR_CLASSES[entryType] || 'text-muted-foreground',
+          });
         } else {
           map.set(key, null);
         }
@@ -545,160 +366,178 @@ export default function LogsPage() {
   }, [aggregated]);
 
   // --- Derived: auto-refresh button label ---
-  const autoLabel = autoRefresh ? '● auto' : '◯ auto';
+  const autoLabel = autoRefresh ? '\u25CF auto' : '\u25CB auto';
 
   // ============================================
   // Render
   // ============================================
   return (
-    <div style={styles.container}>
+    <div className="flex flex-col h-full overflow-hidden p-3">
       {/* ===== Filter Bar ===== */}
-      <div style={styles.filterBar}>
+      <div className="flex items-center gap-2.5 flex-wrap py-2 border-b border-border mb-2 min-h-10">
         {/* Source dropdown */}
-        <div style={styles.filterGroup}>
-          <select
-            style={styles.select}
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-          >
+        <Select value={source} onValueChange={(v) => setSource(v ?? 'all')}>
+          <SelectTrigger size="sm" className="w-fit min-w-[80px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {SOURCE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </div>
+          </SelectContent>
+        </Select>
 
         {/* Level toggle buttons */}
-        <div style={styles.filterGroup}>
-          <span style={styles.filterLabel}>Level:</span>
-          {LEVEL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              style={styles.toggleBtn(level === opt.value)}
-              onClick={() => setLevel(level === opt.value ? '' : opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-muted-foreground">Level:</span>
+          <ToggleGroup
+            value={levelToggleValue}
+            onValueChange={(vals) => setLevel(vals.length > 0 ? vals[vals.length - 1] : '')}
+            variant="outline"
+            size="sm"
+            spacing={0}
+          >
+            {LEVEL_OPTIONS.filter((o) => o.value !== '').map((opt) => (
+              <ToggleGroupItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {/* Type toggle buttons */}
-        <div style={styles.filterGroup}>
-          <span style={styles.filterLabel}>Type:</span>
-          {TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              style={styles.toggleBtn(
-                type === opt.value,
-                opt.color ?? undefined,
-              )}
-              onClick={() => setType(type === opt.value ? '' : opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-muted-foreground">Type:</span>
+          <ToggleGroup
+            value={typeToggleValue}
+            onValueChange={(vals) => setType(vals.length > 0 ? vals[vals.length - 1] : '')}
+            variant="outline"
+            size="sm"
+            spacing={0}
+          >
+            {TYPE_OPTIONS.filter((o) => o.value !== '').map((opt) => (
+              <ToggleGroupItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {/* Lines dropdown */}
-        <div style={styles.filterGroup}>
-          <span style={styles.filterLabel}>Lines:</span>
-          <select
-            style={{ ...styles.select, width: '70px' }}
-            value={lines}
-            onChange={(e) => setLines(e.target.value)}
-          >
-            {LINES_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-muted-foreground">Lines:</span>
+          <Select value={lines} onValueChange={(v) => setLines(v ?? '100')}>
+            <SelectTrigger size="sm" className="w-[70px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LINES_OPTIONS.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Search input */}
-        <div style={styles.filterGroup}>
-          <span style={styles.filterLabel}>Search:</span>
-          <input
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-muted-foreground">Search:</span>
+          <Input
             type="text"
-            style={styles.searchInput}
             placeholder="keyword..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-[140px] h-6 text-xs font-mono"
           />
         </div>
 
         {/* Right-side controls */}
-        <div style={{ ...styles.filterGroup, marginLeft: 'auto' }}>
+        <div className="flex items-center gap-1.5 ml-auto">
           {/* Auto-refresh toggle */}
-          <button
-            style={styles.iconBtn(autoRefresh)}
+          <Button
+            variant={autoRefresh ? 'secondary' : 'ghost'}
+            size="xs"
             onClick={() => {
               setAutoRefresh((prev) => !prev);
             }}
             title="Toggle auto-refresh"
           >
             {autoLabel}
-          </button>
+          </Button>
 
           {/* Mode toggle */}
-          <select
-            style={{ ...styles.select, width: '60px' }}
-            value={mode}
-            onChange={(e) => setMode(e.target.value as 'poll' | 'stream')}
-            title="Refresh mode"
-          >
-            <option value="poll">poll</option>
-            <option value="stream">stream</option>
-          </select>
+          <Select value={mode} onValueChange={(v) => setMode(v as 'poll' | 'stream')}>
+            <SelectTrigger size="sm" className="w-[70px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="poll">poll</SelectItem>
+              <SelectItem value="stream">stream</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Clear button */}
-          <button
-            style={styles.iconBtn()}
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => {
               setLogs([]);
             }}
           >
+            <RiCloseLine className="size-3" />
             Clear
-          </button>
+          </Button>
 
           {/* Refresh button */}
-          <button style={styles.iconBtn()} onClick={fetchLogs}>
-            ↻
-          </button>
+          <Button variant="ghost" size="icon-xs" onClick={fetchLogs} title="Refresh">
+            <RiRefreshLine className="size-3.5" />
+          </Button>
         </div>
       </div>
 
       {/* ===== Component filter bar ===== */}
       {component && (
-        <div style={styles.componentBar}>
-          <span style={{ color: 'var(--fg-muted)' }}>Filtering:</span>
-          <span style={{ color: 'var(--teal, #4ecdc4)', fontWeight: 600 }}>
+        <div className="flex items-center gap-1.5 mb-1.5 px-2 py-1 rounded-md bg-muted/50 text-[11px]">
+          <span className="text-muted-foreground">Filtering:</span>
+          <span className="text-teal-400 font-semibold">
             {component}
           </span>
-          <button
-            style={{
-              ...styles.iconBtn(),
-              fontSize: '10px',
-              padding: '1px 6px',
-            }}
+          <Button
+            variant="ghost"
+            size="xs"
+            className="h-4 px-1 text-[10px]"
             onClick={() => setComponent('')}
           >
-            ✕
-          </button>
+            <RiCloseLine className="size-2.5" />
+          </Button>
         </div>
       )}
 
       {/* ===== Log Panel ===== */}
       <div
         ref={panelRef}
-        style={styles.logPanel}
         onScroll={handleScroll}
+        className="flex-1 overflow-y-auto font-mono text-xs leading-relaxed relative"
       >
         {aggregated.length === 0 ? (
-          <div style={styles.emptyState}>
-            {loading ? 'Loading...' : fetchError ? `Error: ${fetchError}` : 'No log entries'}
-          </div>
+          <Empty className="mt-10">
+            {loading ? (
+              <>
+                <Spinner className="size-5 mb-2" />
+                <EmptyTitle>Loading logs...</EmptyTitle>
+              </>
+            ) : fetchError ? (
+              <>
+                <EmptyTitle className="text-destructive">Error</EmptyTitle>
+                <EmptyDescription>{fetchError}</EmptyDescription>
+              </>
+            ) : (
+              <EmptyTitle>No log entries</EmptyTitle>
+            )}
+          </Empty>
         ) : (
           aggregated.map((entry, idx) => {
             const shortLvl = LEVEL_MAP[entry.level || ''] || 'INF';
@@ -730,40 +569,39 @@ export default function LogsPage() {
 
       {/* ===== Jump-to-bottom button ===== */}
       {!stickyBottom && logs.length > 0 && (
-        <button style={styles.jumpBtn} onClick={scrollToBottom}>
-          ↓ New logs
-        </button>
+        <Button
+          size="xs"
+          onClick={scrollToBottom}
+          className="fixed bottom-20 right-6 z-50 shadow-lg"
+        >
+          <RiArrowDownLine className="size-3.5" />
+          New logs
+        </Button>
       )}
 
       {/* ===== Stats Bar ===== */}
-      <div style={styles.statsBar}>
+      <div className="flex items-center gap-3 py-1.5 text-[11px] text-muted-foreground border-t border-border mt-2 flex-wrap">
         <span>{stats.total} entries</span>
 
         {Object.entries(stats.lvlCounts).map(([lvl, count]) =>
           count > 0 ? (
-            <span key={lvl} style={{ color: LEVEL_COLORS[lvl] || 'var(--fg-muted)' }}>
+            <span key={lvl} className={LEVEL_COLOR_CLASSES[lvl] || 'text-muted-foreground'}>
               {lvl} {count}
             </span>
           ) : null,
         )}
 
-        {Object.entries(stats.typeCounts).map(([t, c]) => {
-          const opt = TYPE_OPTIONS.find((o) => o.value === t);
-          return (
-            <span
-              key={t}
-              style={{
-                color: (opt && 'color' in opt ? opt.color : null) || 'var(--fg-muted)',
-                marginLeft: '6px',
-              }}
-            >
-              {t} {c}
-            </span>
-          );
-        })}
+        {Object.entries(stats.typeCounts).map(([t, c]) => (
+          <span
+            key={t}
+            className={`${TYPE_COLOR_CLASSES[t] || 'text-muted-foreground'} ml-1.5`}
+          >
+            {t} {c}
+          </span>
+        ))}
 
         {stats.componentCount > 0 && (
-          <span style={{ marginLeft: 'auto', color: 'var(--fg-subtle)' }}>
+          <span className="ml-auto text-muted-foreground/60">
             {stats.componentCount} components
           </span>
         )}
@@ -789,7 +627,7 @@ function LogLine({
 }: {
   shortLvl: string;
   time: string;
-  entryType: { type: string; color: string } | null;
+  entryType: { type: string; colorClass: string } | null;
   component: string;
   message: string;
   count: number;
@@ -808,35 +646,36 @@ function LogLine({
     setTimeout(() => setCopied(false), 1000);
   };
 
+  const lineBg =
+    shortLvl === 'ERR'
+      ? 'bg-red-500/5'
+      : shortLvl === 'WRN'
+        ? 'bg-amber-500/5'
+        : '';
+
   return (
     <div
       ref={lineRef}
-      style={{
-        display: 'flex',
-        alignItems: 'baseline',
-        padding: '1px 4px',
-        borderRadius: '3px',
-        backgroundColor:
-          shortLvl === 'ERR'
-            ? 'rgba(255,107,107,0.06)'
-            : shortLvl === 'WRN'
-              ? 'rgba(255,172,2,0.04)'
-              : 'transparent',
-        cursor: 'default',
-      }}
+      className={`flex items-baseline px-1 py-px rounded-sm cursor-default ${lineBg}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Timestamp */}
-      <span style={styles.logTimestamp}>[{time}]</span>
+      <span className="text-muted-foreground select-none min-w-[70px] shrink-0">
+        [{time}]
+      </span>
 
       {/* Level badge */}
-      <span style={styles.logLevel(shortLvl)}>{shortLvl}</span>
+      <span
+        className={`min-w-[32px] text-center font-semibold select-none shrink-0 ${LEVEL_COLOR_CLASSES[shortLvl] || 'text-muted-foreground'}`}
+      >
+        {shortLvl}
+      </span>
 
       {/* Type badge (clickable) */}
       {entryType && (
         <span
-          style={styles.typeBadge(entryType.color)}
+          className={`font-semibold text-[10px] tracking-wider px-1 py-0 rounded-sm ml-1 cursor-pointer shrink-0 ${entryType.colorClass} ${TYPE_BG_CLASSES[entryType.type] || ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onTypeClick();
@@ -850,7 +689,7 @@ function LogLine({
       {/* Component tag (clickable) */}
       {component ? (
         <span
-          style={styles.componentTag}
+          className="cursor-pointer text-teal-400 no-underline mr-1 shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onComponentClick();
@@ -860,27 +699,30 @@ function LogLine({
           {component}
         </span>
       ) : (
-        <span style={{ minWidth: '40px', flexShrink: 0 }} />
+        <span className="min-w-[40px] shrink-0" />
       )}
 
       {/* Message + duplicate count */}
-      <span style={styles.logMessage}>
+      <span className="flex-1 break-all">
         {message}
         {count > 1 && (
-          <span style={styles.duplicateBadge}>×{count}</span>
+          <span className="text-red-400 font-bold ml-1 shrink-0">
+            &times;{count}
+          </span>
         )}
       </span>
 
       {/* Copy icon */}
       <span
-        style={{
-          ...styles.copyIcon,
-          ...(hovered || copied ? styles.copyIconVisible : {}),
-        }}
+        className={`cursor-pointer text-muted-foreground ml-1.5 shrink-0 select-none transition-opacity duration-150 ${hovered || copied ? 'opacity-100' : 'opacity-0'}`}
         onClick={handleCopy}
         title="Copy"
       >
-        {copied ? '✓' : '⧉'}
+        {copied ? (
+          <RiCheckLine className="size-3 inline" />
+        ) : (
+          <RiFileCopyLine className="size-3 inline" />
+        )}
       </span>
     </div>
   );

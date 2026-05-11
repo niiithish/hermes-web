@@ -3,6 +3,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/app/lib/api-client';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { RiAddLine, RiRefreshLine, RiDeleteBin6Line, RiFileCopyLine, RiCheckLine } from '@remixicon/react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -13,190 +29,6 @@ interface AgentProfile {
   model?: string;
   alias?: string;
 }
-
-// ─── Shared styles ───────────────────────────────────────────────────────────
-
-const pageHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  marginBottom: '16px',
-};
-
-const pageTitleStyle: React.CSSProperties = {
-  fontSize: '20px',
-  fontWeight: 700,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase' as const,
-  color: 'var(--fg)',
-};
-
-const pageSubtitleStyle: React.CSSProperties = {
-  fontSize: '13px',
-  color: 'var(--fg-muted)',
-  marginTop: '4px',
-};
-
-const cardStyle: React.CSSProperties = {
-  background: 'var(--bg-card)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius)',
-  padding: '16px',
-  display: 'flex',
-  flexDirection: 'column',
-};
-
-const cardTitleStyle: React.CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 600,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase' as const,
-  color: 'var(--fg)',
-};
-
-const cardGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, 1fr)',
-  gap: '16px',
-};
-
-const statRowStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '6px 0',
-  borderBottom: '1px solid var(--border)',
-  fontSize: '13px',
-};
-
-const statLabelStyle: React.CSSProperties = {
-  color: 'var(--fg-muted)',
-  flexShrink: 0,
-  marginRight: '12px',
-};
-
-const statValueStyle: React.CSSProperties = {
-  color: 'var(--fg)',
-  fontWeight: 500,
-  textAlign: 'right',
-};
-
-const btnGhostStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '6px',
-  padding: '6px 16px',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius)',
-  background: 'var(--bg-panel)',
-  color: 'var(--fg)',
-  fontFamily: 'var(--font)',
-  fontSize: '12px',
-  fontWeight: 500,
-  cursor: 'pointer',
-  transition: 'all 0.2s',
-  whiteSpace: 'nowrap' as const,
-};
-
-const btnPrimaryStyle: React.CSSProperties = {
-  ...btnGhostStyle,
-  background: 'var(--accent)',
-  color: '#fff',
-  border: 'none',
-};
-
-const btnSmStyle: React.CSSProperties = {
-  padding: '4px 10px',
-  fontSize: '11px',
-};
-
-const btnDangerStyle: React.CSSProperties = {
-  ...btnGhostStyle,
-  ...btnSmStyle,
-  color: 'var(--red)',
-  borderColor: 'var(--red)',
-};
-
-const badgeStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '2px 6px',
-  fontSize: '10px',
-  fontWeight: 600,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase' as const,
-  borderRadius: '4px',
-  border: '1px solid var(--border)',
-  background: 'var(--accent-dim)',
-  color: 'var(--accent)',
-};
-
-const statusOkStyle: React.CSSProperties = {
-  color: 'var(--green)',
-};
-
-const statusOffStyle: React.CSSProperties = {
-  color: 'var(--fg-muted)',
-};
-
-const errorStyle: React.CSSProperties = {
-  color: 'var(--red)',
-  fontSize: '13px',
-  padding: '8px 0',
-};
-
-const modalOverlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(0,0,0,0.6)',
-  zIndex: 999,
-};
-
-const modalCardStyle: React.CSSProperties = {
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-lg)',
-  padding: '24px',
-  minWidth: '360px',
-  maxWidth: '90vw',
-  boxShadow: 'var(--shadow)',
-};
-
-const modalTitleStyle: React.CSSProperties = {
-  fontSize: '16px',
-  fontWeight: 600,
-  marginBottom: '16px',
-  color: 'var(--fg-base)',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  background: 'var(--bg-input)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius)',
-  color: 'var(--fg)',
-  fontFamily: 'var(--font)',
-  fontSize: '12px',
-  outline: 'none',
-  marginBottom: '12px',
-};
-
-const toastStyle: React.CSSProperties = {
-  position: 'fixed',
-  bottom: '24px',
-  right: '24px',
-  padding: '10px 20px',
-  borderRadius: 'var(--radius)',
-  fontSize: '13px',
-  fontWeight: 500,
-  zIndex: 9999,
-  boxShadow: 'var(--shadow)',
-};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -371,204 +203,227 @@ export default function AgentsPage() {
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '24px', height: '100%', overflowY: 'auto' }}>
-      {/* ── Page Header ────────────────────────────────────────────────── */}
-      <div style={pageHeaderStyle}>
-        <div>
-          <div style={pageTitleStyle}>Agents</div>
-          <div style={pageSubtitleStyle}>Manage your Hermes profiles</div>
+    <ScrollArea className="h-full">
+      <div className="p-6">
+        {/* ── Page Header ────────────────────────────────────────────────── */}
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-xl font-bold uppercase tracking-wider">Agents</h1>
+            <p className="text-xs text-muted-foreground mt-1">Manage your Hermes profiles</p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleOpenCreate}>
+              <RiAddLine />
+              Create Agent
+            </Button>
+            <Button variant="outline" onClick={loadAgents}>
+              <RiRefreshLine />
+              Refresh
+            </Button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button style={btnPrimaryStyle} onClick={handleOpenCreate}>
-            + Create Agent
-          </button>
-          <button style={btnGhostStyle} onClick={loadAgents}>
-            ↻ Refresh
-          </button>
-        </div>
-      </div>
 
-      {/* ── Error message ──────────────────────────────────────────────── */}
-      {error && <div style={errorStyle}>{error}</div>}
+        {/* ── Error message ──────────────────────────────────────────────── */}
+        {error && <p className="text-destructive text-xs py-2">{error}</p>}
 
-      {/* ── Loading ────────────────────────────────────────────────────── */}
-      {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', color: 'var(--fg-muted)', fontStyle: 'italic' }}>
-          Loading agents...
-        </div>
-      )}
+        {/* ── Loading ────────────────────────────────────────────────────── */}
+        {loading && (
+          <div className="flex items-center justify-center py-10 text-muted-foreground italic gap-2">
+            <Spinner />
+            Loading agents...
+          </div>
+        )}
 
-      {/* ── Empty state ────────────────────────────────────────────────── */}
-      {!loading && !error && agents.length === 0 && (
-        <div style={{ ...cardStyle, alignItems: 'center', justifyContent: 'center', padding: '40px', color: 'var(--fg-muted)' }}>
-          No agents found. Create your first agent profile to get started.
-        </div>
-      )}
+        {/* ── Empty state ────────────────────────────────────────────────── */}
+        {!loading && !error && agents.length === 0 && (
+          <Card className="items-center justify-center py-10">
+            <CardContent className="text-muted-foreground text-center">
+              No agents found. Create your first agent profile to get started.
+            </CardContent>
+          </Card>
+        )}
 
-      {/* ── Agent cards grid ───────────────────────────────────────────── */}
-      {!loading && agents.length > 0 && (
-        <div style={cardGridStyle}>
-          {agents.map((p) => {
-            const isRunning = p.gateway === 'running';
-            return (
-              <div key={p.name} style={cardStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={cardTitleStyle}>{p.name}</div>
-                  {p.active && <span style={badgeStyle}>default</span>}
-                </div>
-                <div style={statRowStyle}>
-                  <span style={statLabelStyle}>Status</span>
-                  <span style={{ ...statValueStyle, ...(isRunning ? statusOkStyle : statusOffStyle) }}>
-                    {isRunning ? '● Running' : '○ Stopped'}
-                  </span>
-                </div>
-                <div style={statRowStyle}>
-                  <span style={statLabelStyle}>Model</span>
-                  <span style={statValueStyle}>{p.model || '—'}</span>
-                </div>
-                {p.alias && (
-                  <div style={statRowStyle}>
-                    <span style={statLabelStyle}>Alias</span>
-                    <span style={statValueStyle}>{p.alias}</span>
-                  </div>
-                )}
-                <div style={{ marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <button
-                    style={{ ...btnGhostStyle, ...btnSmStyle }}
-                    onClick={() => router.push(`/agents/${encodeURIComponent(p.name)}`)}
-                  >
-                    Open
-                  </button>
-                  {!p.active && (
-                    <button
-                      style={{ ...btnGhostStyle, ...btnSmStyle }}
-                      onClick={() => handleSetDefault(p.name)}
-                    >
-                      Set Default
-                    </button>
-                  )}
-                  {p.name !== 'default' && (
-                    <button
-                      style={btnDangerStyle}
-                      onClick={() => handleDeleteAgent(p.name)}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {/* ── Agent cards grid ───────────────────────────────────────────── */}
+        {!loading && agents.length > 0 && (
+          <div className="grid grid-cols-2 gap-4">
+            {agents.map((p) => {
+              const isRunning = p.gateway === 'running';
+              return (
+                <Card key={p.name}>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <CardTitle>{p.name}</CardTitle>
+                      {p.active && <Badge>default</Badge>}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between items-center py-1.5 border-b text-xs">
+                      <span className="text-muted-foreground shrink-0 mr-3">Status</span>
+                      <span className={`font-medium text-right ${isRunning ? 'text-green-500' : 'text-muted-foreground'}`}>
+                        {isRunning ? '\u25CF Running' : '\u25CB Stopped'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b text-xs">
+                      <span className="text-muted-foreground shrink-0 mr-3">Model</span>
+                      <span className="font-medium text-right">{p.model || '\u2014'}</span>
+                    </div>
+                    {p.alias && (
+                      <div className="flex justify-between items-center py-1.5 border-b text-xs">
+                        <span className="text-muted-foreground shrink-0 mr-3">Alias</span>
+                        <span className="font-medium text-right">{p.alias}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/agents/${encodeURIComponent(p.name)}`)}
+                      >
+                        Open
+                      </Button>
+                      {!p.active && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSetDefault(p.name)}
+                        >
+                          Set Default
+                        </Button>
+                      )}
+                      {p.name !== 'default' && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteAgent(p.name)}
+                        >
+                          <RiDeleteBin6Line />
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
-      {/* ── Create Agent Modal ─────────────────────────────────────────── */}
-      {showCreateModal && (
-        <div
-          style={modalOverlayStyle}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
-        >
-          <div style={{ ...modalCardStyle, width: '420px' }}>
-            <div style={modalTitleStyle}>Create Agent</div>
-            <div style={{ fontSize: '13px', color: 'var(--fg-muted)', marginBottom: '16px' }}>
-              Create a new Hermes profile.
-            </div>
+        {/* ── Create Agent Dialog ─────────────────────────────────────────── */}
+        <Dialog open={showCreateModal} onOpenChange={(open) => { if (!open) setShowCreateModal(false); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Create Agent</DialogTitle>
+              <DialogDescription>
+                Create a new Hermes profile.
+              </DialogDescription>
+            </DialogHeader>
 
             <form onSubmit={handleCreateSubmit}>
-              <input
-                type="text"
-                placeholder="Agent name (e.g. worker, analyst)"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                style={inputStyle}
-                autoFocus
-              />
-
-              {createMode === 'clone' && (
-                <input
+              <div className="flex flex-col gap-3 mb-4">
+                <Input
                   type="text"
-                  placeholder="Source profile (e.g. david)"
-                  value={cloneSource}
-                  onChange={(e) => setCloneSource(e.target.value)}
-                  style={inputStyle}
+                  placeholder="Agent name (e.g. worker, analyst)"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  autoFocus
                 />
-              )}
 
-              {createError && (
-                <div style={{ ...errorStyle, marginBottom: '8px' }}>{createError}</div>
-              )}
+                {createMode === 'clone' && (
+                  <Input
+                    type="text"
+                    placeholder="Source profile (e.g. david)"
+                    value={cloneSource}
+                    onChange={(e) => setCloneSource(e.target.value)}
+                  />
+                )}
 
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  style={btnGhostStyle}
-                  onClick={() => setShowCreateModal(false)}
+                {createError && (
+                  <p className="text-destructive text-xs">{createError}</p>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2">
+                <DialogClose
+                  render={<Button variant="outline" />}
                 >
                   Cancel
-                </button>
-                <button
+                </DialogClose>
+                <Button
                   type="button"
-                  style={{ ...btnGhostStyle, ...(createMode === 'clone' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}) }}
+                  variant={createMode === 'clone' ? 'outline' : 'outline'}
+                  className={createMode === 'clone' ? 'border-primary text-primary' : ''}
                   onClick={() => setCreateMode(createMode === 'clone' ? null : 'clone')}
                 >
-                  {createMode === 'clone' ? '✓ Clone From' : 'Clone From...'}
-                </button>
-                <button
+                  {createMode === 'clone' ? (
+                    <><RiCheckLine /> Clone From</>
+                  ) : (
+                    <><RiFileCopyLine /> Clone From...</>
+                  )}
+                </Button>
+                <Button
                   type="submit"
-                  style={{ ...btnPrimaryStyle, opacity: createSubmitting ? 0.7 : 1 }}
                   disabled={createSubmitting}
                 >
-                  {createSubmitting ? 'Creating...' : (createMode === 'clone' ? 'Clone' : 'Create Fresh')}
-                </button>
-              </div>
+                  {createSubmitting ? (
+                    'Creating...'
+                  ) : createMode === 'clone' ? (
+                    'Clone'
+                  ) : (
+                    'Create Fresh'
+                  )}
+                </Button>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        </Dialog>
 
-      {/* ── Confirm Dialog ─────────────────────────────────────────────── */}
-      {confirmDialog && (
-        <div
-          style={modalOverlayStyle}
-          onClick={() => {
-            (window as any).__confirmCancel?.();
+        {/* ── Confirm Dialog ─────────────────────────────────────────────── */}
+        <Dialog
+          open={!!confirmDialog}
+          onOpenChange={(open) => {
+            if (!open) (window as any).__confirmCancel?.();
           }}
         >
-          <div style={{ ...modalCardStyle, width: '380px' }}>
-            <div style={modalTitleStyle}>{confirmDialog.title}</div>
-            <div style={{ fontSize: '13px', color: 'var(--fg-muted)', marginBottom: '16px' }}>
-              {confirmDialog.message}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                style={btnGhostStyle}
-                onClick={() => {
-                  (window as any).__confirmCancel?.();
-                }}
+          <DialogContent className="sm:max-w-[380px]">
+            <DialogHeader>
+              <DialogTitle>{confirmDialog?.title}</DialogTitle>
+              <DialogDescription>
+                {confirmDialog?.message}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => (window as any).__confirmCancel?.()}
               >
                 Cancel
-              </button>
-              <button
-                style={btnPrimaryStyle}
-                onClick={() => confirmDialog.onConfirm()}
+              </Button>
+              <Button
+                onClick={() => confirmDialog?.onConfirm()}
               >
                 Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* ── Toast ──────────────────────────────────────────────────────── */}
-      {toast && (
-        <div style={{
-          ...toastStyle,
-          background: toast.type === 'success' ? 'var(--green)' : toast.type === 'error' ? 'var(--red)' : 'var(--accent)',
-          color: '#fff',
-        }}>
-          {toast.message}
-        </div>
-      )}
-    </div>
+        {/* ── Toast ──────────────────────────────────────────────────────── */}
+        {toast && (
+          <div
+            className={`fixed bottom-6 right-6 px-5 py-2.5 rounded-md text-xs font-medium z-[9999] shadow-lg text-white ${
+              toast.type === 'success'
+                ? 'bg-green-500'
+                : toast.type === 'error'
+                  ? 'bg-destructive'
+                  : 'bg-primary'
+            }`}
+          >
+            {toast.message}
+          </div>
+        )}
+      </div>
+    </ScrollArea>
   );
 }

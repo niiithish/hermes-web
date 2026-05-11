@@ -2,6 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/app/lib/api-client';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Spinner } from '@/components/ui/spinner';
+import { Empty, EmptyMedia, EmptyDescription } from '@/components/ui/empty';
+import {
+  RiSendPlaneFill,
+  RiAddLine,
+  RiMessage2Line,
+  RiCloseLine,
+  RiHistoryLine,
+  RiStopFill,
+  RiMenuLine,
+} from '@remixicon/react';
 
 interface Session {
   id: string;
@@ -316,128 +331,102 @@ export default function ChatPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div className="flex h-full">
       {/* Sidebar */}
       {sidebarOpen && (
         <>
-          <div
-            style={{
-              width: '280px',
-              borderRight: '1px solid var(--border)',
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'var(--bg-panel)',
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ padding: '10px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div className="w-[280px] border-r bg-card flex flex-col shrink-0">
+            <div className="p-2.5 border-b flex flex-col gap-1.5">
+              <div className="flex gap-1.5 items-center">
                 <select
                   value={selectedProfile}
                   onChange={(e) => setSelectedProfile(e.target.value)}
-                  style={{ flex: 1, padding: '4px 8px', fontSize: '12px' }}
+                  className="flex-1 h-7 px-2 text-xs rounded-md border bg-muted/50 cursor-pointer"
                 >
                   {profiles.map((p) => (
-                    <option key={p.name} value={p.name}>{p.name}{p.active ? ' ★' : ''}</option>
+                    <option key={p.name} value={p.name}>{p.name}{p.active ? ' *' : ''}</option>
                   ))}
                   {profiles.length === 0 && <option value="default">default</option>}
                 </select>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => setSidebarOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--fg-muted)',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    padding: '2px',
-                  }}
                 >
-                  ✕
-                </button>
+                  <RiCloseLine className="size-3" />
+                </Button>
               </div>
-              <input
+              <Input
                 type="search"
                 placeholder="Search sessions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
+                className="h-7 text-xs"
               />
-              <button
-                className="btn btn-primary btn-sm"
+              <Button
+                variant="default"
+                size="sm"
                 onClick={newChatSession}
-                style={{ width: '100%' }}
+                className="w-full"
               >
-                + New Chat
-              </button>
+                <RiAddLine className="size-3.5" />
+                New Chat
+              </Button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
-              {loadingSessions && <div className="loading">Loading sessions...</div>}
+            <ScrollArea className="flex-1 p-1">
+              {loadingSessions && (
+                <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground text-xs">
+                  <Spinner className="size-3.5" />
+                  Loading sessions...
+                </div>
+              )}
               {!loadingSessions && filteredSessions.length === 0 && (
-                <div className="empty">No sessions yet</div>
+                <Empty>
+                  <EmptyMedia variant="icon">
+                    <RiHistoryLine className="size-4" />
+                  </EmptyMedia>
+                  <EmptyDescription>No sessions yet</EmptyDescription>
+                </Empty>
               )}
               {filteredSessions.map((session) => (
                 <div
                   key={session.id}
                   onClick={() => loadSessionMessages(session.id)}
-                  style={{
-                    padding: '8px 10px',
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius)',
-                    marginBottom: '2px',
-                    background: currentSessionId === session.id ? 'var(--accent-dim)' : 'transparent',
-                    border: `1px solid ${currentSessionId === session.id ? 'var(--accent)' : 'transparent'}`,
-                    transition: 'all var(--transition)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentSessionId !== session.id) e.currentTarget.style.background = 'var(--bg-panel-hover)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentSessionId !== session.id) e.currentTarget.style.background = 'transparent';
-                  }}
+                  className={cn(
+                    'px-2.5 py-2 cursor-pointer rounded-md mb-0.5 transition-colors',
+                    currentSessionId === session.id
+                      ? 'bg-primary/10 border border-primary'
+                      : 'bg-transparent border border-transparent hover:bg-muted'
+                  )}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div className="flex justify-between items-start">
+                    <div className="text-xs font-medium flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                       {session.title || session.id.slice(0, 16)}
                     </div>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={(e) => deleteSession(session.id, e)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--fg-muted)',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        padding: '2px 4px',
-                        opacity: 0.5,
-                      }}
+                      className="opacity-40 hover:opacity-100 -mr-1"
                     >
-                      ✕
-                    </button>
+                      <RiCloseLine className="size-2.5" />
+                    </Button>
                   </div>
                   {session.preview && (
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--fg-subtle)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      marginTop: '2px',
-                    }}>
+                    <div className="text-[11px] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap mt-0.5">
                       {session.preview}
                     </div>
                   )}
-                  <div style={{ fontSize: '10px', color: 'var(--fg-subtle)', marginTop: '2px' }}>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
                     {(session.messageCount || session.message_count || 0)} msgs
-                    {((session.startedAt || session.started_at)) && ` · ${formatDate(session.startedAt || session.started_at!)}`}
+                    {((session.startedAt || session.started_at)) && ` * ${formatDate(session.startedAt || session.started_at!)}`}
                   </div>
                 </div>
               ))}
-            </div>
+            </ScrollArea>
           </div>
           {/* Mobile backdrop */}
           <div
-            style={{ display: 'none' }}
             className="chat-sidebar-backdrop"
             onClick={() => setSidebarOpen(false)}
           />
@@ -445,29 +434,22 @@ export default function ChatPage() {
       )}
 
       {/* Main chat area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '8px 16px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--bg-panel)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-card">
+          <div className="flex items-center gap-2">
             {!sidebarOpen && (
-              <button
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 onClick={() => setSidebarOpen(true)}
-                className="icon-btn"
-                style={{ fontSize: '14px', padding: '4px 8px' }}
               >
-                ☰
-              </button>
+                <RiMenuLine className="size-3.5" />
+              </Button>
             )}
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 500 }}>{title}</div>
-              <div style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>
+              <div className="text-sm font-medium">{title}</div>
+              <div className="text-[11px] text-muted-foreground">
                 {streaming ? 'Streaming...' : currentSessionId ? currentSessionId.slice(0, 20) : 'No session'}
               </div>
             </div>
@@ -475,71 +457,48 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}>
-          {loadingMessages && <div className="loading">Loading messages...</div>}
-          {!loadingMessages && messages.length === 0 && !streaming && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: 'var(--fg-muted)',
-            }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>💬</div>
-              <div>Start a conversation with your Hermes agent</div>
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+          {loadingMessages && (
+            <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground text-xs">
+              <Spinner className="size-3.5" />
+              Loading messages...
             </div>
+          )}
+          {!loadingMessages && messages.length === 0 && !streaming && (
+            <Empty>
+              <EmptyMedia variant="icon">
+                <RiMessage2Line className="size-4" />
+              </EmptyMedia>
+              <EmptyDescription>Start a conversation with your Hermes agent</EmptyDescription>
+            </Empty>
           )}
           {messages.map((msg, idx) => (
             <div
               key={idx}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '85%',
-                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              }}
+              className={cn(
+                'flex flex-col max-w-[85%]',
+                msg.role === 'user' ? 'items-end self-end' : 'items-start self-start'
+              )}
             >
               <div
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 'var(--radius-lg)',
-                  background: msg.role === 'user' ? 'var(--accent-dim)' : 'var(--bg-panel)',
-                  border: `1px solid ${msg.role === 'user' ? 'var(--accent)' : 'var(--border)'}`,
-                  color: 'var(--fg)',
-                  fontSize: '13px',
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                }}
+                className={cn(
+                  'px-3.5 py-2 rounded-lg border text-sm leading-relaxed break-words',
+                  msg.role === 'user'
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-card border-border'
+                )}
                 dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
               />
               {msg.reasoning && (
-                <div style={{
-                  marginTop: '4px',
-                  padding: '6px 10px',
-                  fontSize: '11px',
-                  color: 'var(--fg-muted)',
-                  background: 'var(--bg-input)',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  maxWidth: '100%',
-                }}>
-                  <div style={{ fontWeight: 500, marginBottom: '2px', fontSize: '10px', color: 'var(--amber)' }}>
+                <div className="mt-1 px-2.5 py-1.5 text-[11px] text-muted-foreground bg-muted/50 rounded-md border border-border max-w-full">
+                  <div className="font-medium mb-0.5 text-[10px] text-amber-600 dark:text-amber-400">
                     Reasoning
                   </div>
-                  <div>{msg.reasoning}</div>
+                  <div className="whitespace-pre-wrap break-words">{msg.reasoning}</div>
                 </div>
               )}
               {msg.token_count && msg.role === 'assistant' && (
-                <div style={{ fontSize: '10px', color: 'var(--fg-subtle)', marginTop: '2px' }}>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
                   {msg.token_count} tokens
                 </div>
               )}
@@ -548,22 +507,8 @@ export default function ChatPage() {
 
           {/* Streaming indicator */}
           {streaming && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              color: 'var(--fg-muted)',
-              fontSize: '12px',
-            }}>
-              <span style={{
-                display: 'inline-block',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: 'var(--accent)',
-                animation: 'pulse 1s ease-in-out infinite',
-              }} />
+            <div className="flex items-center gap-1.5 px-3.5 py-2 text-muted-foreground text-xs">
+              <span className="inline-block size-2 rounded-full bg-primary animate-pulse" />
               Streaming... ({formatTime(elapsed)})
             </div>
           )}
@@ -572,26 +517,13 @@ export default function ChatPage() {
         </div>
 
         {error && (
-          <div style={{
-            padding: '8px 16px',
-            color: 'var(--red)',
-            fontSize: '12px',
-            background: 'var(--bg-panel)',
-            borderTop: '1px solid var(--border)',
-          }}>
+          <div className="px-4 py-2 text-destructive text-xs bg-destructive/10 border-t border-border">
             {error}
           </div>
         )}
 
         {/* Input area */}
-        <div style={{
-          padding: '10px 16px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--bg-panel)',
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'flex-end',
-        }}>
+        <div className="p-2.5 px-4 border-t bg-card flex gap-2 items-end">
           <textarea
             ref={inputRef}
             value={input}
@@ -599,45 +531,30 @@ export default function ChatPage() {
             onKeyDown={handleKeyDown}
             placeholder="Type a message... (Enter to send)"
             rows={1}
-            style={{
-              flex: 1,
-              resize: 'none',
-              maxHeight: '120px',
-              padding: '8px 12px',
-              fontSize: '13px',
-              fontFamily: 'var(--font)',
-              background: 'var(--bg-input)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              color: 'var(--fg)',
-              outline: 'none',
-            }}
+            className="flex-1 resize-none min-h-9 max-h-[120px] px-3 py-2 text-xs rounded-md border bg-muted/50 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 placeholder:text-muted-foreground"
           />
           {streaming ? (
-            <button
-              className="btn btn-danger btn-sm"
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={stopStream}
             >
+              <RiStopFill className="size-3.5" />
               Stop
-            </button>
+            </Button>
           ) : (
-            <button
-              className="btn btn-primary"
+            <Button
+              variant="default"
+              size="sm"
               onClick={sendMessage}
               disabled={!input.trim()}
             >
+              <RiSendPlaneFill className="size-3.5" />
               Send
-            </button>
+            </Button>
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning className={cn("font-mono", geistMono.variable, geistHeading.variable)}>
+    <html lang="en" data-theme="dark" suppressHydrationWarning className={cn("h-full font-mono", geistMono.variable, geistHeading.variable)}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
         />
       </head>
-      <body>
+      <body className="h-full">
         <Providers>
           {children}
         </Providers>

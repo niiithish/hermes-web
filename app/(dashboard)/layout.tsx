@@ -27,9 +27,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
       <Topbar />
-      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <main className="flex-1 overflow-hidden relative">
         {children}
       </main>
     </div>
