@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/app/hooks/useAuth";
 import { api } from "@/app/lib/api-client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,41 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { RiTerminalLine, RiRefreshLine } from "@remixicon/react";
 
-export default function HomeRedirect() {
-  const { user, loading, isFirstRun } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-    if (isFirstRun) {
-      router.replace("/setup");
-    } else if (!user) {
-      router.replace("/login");
-    }
-  }, [user, loading, isFirstRun, router]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        <Spinner className="mr-2" /> Redirecting...
-      </div>
-    );
-  }
-
-  return <HomePage />;
-}
-
-// ── HomePage ─────────────────────────────────────────────────────────────────
-
-function HomePage() {
+export default function HomePage() {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -316,7 +281,7 @@ function HomePage() {
                   <span
                     className={c.ok ? "text-green-500" : "text-destructive"}
                   >
-                    {c.ok ? "✅" : "❌"}
+                    {c.ok ? "●" : "○"}
                   </span>
                   <span>{c.label}</span>
                   {c.detail && (

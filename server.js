@@ -639,7 +639,8 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
         /^✅/mu.test(text) ||
         /^⚠️/mu.test(text) ||
         /resumed/i.test(text) ||
-        /initializing/i.test(text);
+        /initializing/i.test(text) ||
+        /session_id/i.test(text);
       if (isNoise) return;
       res.write(`data: ${JSON.stringify({ type: 'error', content: text })}\n\n`);
     });

@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { api } from '@/app/lib/api-client';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Spinner } from '@/components/ui/spinner';
-import { Empty, EmptyMedia, EmptyDescription } from '@/components/ui/empty';
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { api } from "@/app/lib/api-client";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
+import { Empty, EmptyMedia, EmptyDescription } from "@/components/ui/empty";
 import {
   RiSendPlaneFill,
   RiAddLine,
@@ -18,7 +19,7 @@ import {
   RiMenuLine,
   RiArrowRightSLine,
   RiArrowDownSLine,
-} from '@remixicon/react';
+} from "@remixicon/react";
 
 interface Session {
   id: string;
@@ -39,7 +40,7 @@ interface Session {
 
 interface Message {
   id?: number;
-  role: 'user' | 'assistant' | 'system' | 'tool';
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
   timestamp?: number;
   token_count?: number;
@@ -49,7 +50,7 @@ interface Message {
 
 /** Parse <think>...</think> blocks out of assistant message content into separate reasoning field */
 function extractThinking(msg: Message): Message {
-  if (!msg.content || msg.role !== 'assistant') return msg;
+  if (!msg.content || msg.role !== "assistant") return msg;
   const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
   let match;
   const reasoningParts: string[] = [];
@@ -57,13 +58,15 @@ function extractThinking(msg: Message): Message {
     if (match[1].trim()) reasoningParts.push(match[1].trim());
   }
   if (reasoningParts.length === 0) return msg;
-  const cleanedContent = msg.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  const cleanedContent = msg.content
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .trim();
   return {
     ...msg,
     content: cleanedContent || msg.content,
     reasoning: msg.reasoning
-      ? msg.reasoning + '\n' + reasoningParts.join('\n')
-      : reasoningParts.join('\n'),
+      ? msg.reasoning + "\n" + reasoningParts.join("\n")
+      : reasoningParts.join("\n"),
   };
 }
 
@@ -72,23 +75,28 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [profiles, setProfiles] = useState<Array<{ name: string; active?: boolean }>>([]);
-  const [selectedProfile, setSelectedProfile] = useState('default');
-  const [title, setTitle] = useState('New Chat');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [profiles, setProfiles] = useState<
+    Array<{ name: string; active?: boolean }>
+  >([]);
+  const [selectedProfile, setSelectedProfile] = useState("default");
+  const [title, setTitle] = useState("New Chat");
   const [elapsed, setElapsed] = useState(0);
-  const [error, setError] = useState('');
-  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
+  const [error, setError] = useState("");
+  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(
+    new Set(),
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamRef = useRef<AbortController | null>(null);
   const streamingMsgIndexRef = useRef<number | null>(null);
+  const reasoningBufferRef = useRef("");
 
   // Load sessions on mount
   useEffect(() => {
@@ -96,39 +104,44 @@ export default function ChatPage() {
     loadProfiles();
   }, []);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages — instant snap, no smooth animation
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
   // Restore last session from localStorage
   useEffect(() => {
-    const lastSid = localStorage.getItem('hci-last-session');
+    const lastSid = localStorage.getItem("hci-last-session");
     if (lastSid && sessions.length > 0) {
       const found = sessions.find((s) => s.id === lastSid);
       if (found) {
         loadSessionMessages(lastSid);
       } else {
-        localStorage.removeItem('hci-last-session');
+        localStorage.removeItem("hci-last-session");
       }
     }
   }, [sessions]);
 
-  const loadSessions = async () => {
+  const loadSessions = async (silent = false) => {
     try {
-      setLoadingSessions(true);
-      const data = await api.get<{ ok: boolean; sessions: Session[] }>('/api/sessions');
+      if (!silent) setLoadingSessions(true);
+      const data = await api.get<{ ok: boolean; sessions: Session[] }>(
+        "/api/sessions",
+      );
       if (data.ok) setSessions(data.sessions || []);
     } catch (err) {
-      console.error('Failed to load sessions:', err);
+      console.error("Failed to load sessions:", err);
     } finally {
-      setLoadingSessions(false);
+      if (!silent) setLoadingSessions(false);
     }
   };
 
   const loadProfiles = async () => {
     try {
-      const data = await api.get<{ ok: boolean; profiles: Array<{ name: string; active?: boolean }> }>('/api/profiles');
+      const data = await api.get<{
+        ok: boolean;
+        profiles: Array<{ name: string; active?: boolean }>;
+      }>("/api/profiles");
       if (data.ok && data.profiles) {
         setProfiles(data.profiles);
         const active = data.profiles.find((p) => p.active);
@@ -142,15 +155,19 @@ export default function ChatPage() {
       setLoadingMessages(true);
       setCurrentSessionId(sessionId);
       setMessages([]);
-      const data = await api.get<{ ok: boolean; messages: Message[]; session: Session }>(`/api/sessions/${encodeURIComponent(sessionId)}/messages`);
+      const data = await api.get<{
+        ok: boolean;
+        messages: Message[];
+        session: Session;
+      }>(`/api/sessions/${encodeURIComponent(sessionId)}/messages`);
       if (data.ok) {
         // Parse thinking tags from stored messages
         setMessages((data.messages || []).map(extractThinking));
         setTitle(data.session?.title || sessionId);
       }
-      localStorage.setItem('hci-last-session', sessionId);
+      localStorage.setItem("hci-last-session", sessionId);
     } catch (err) {
-      setError('Failed to load messages');
+      setError("Failed to load messages");
     } finally {
       setLoadingMessages(false);
     }
@@ -159,20 +176,22 @@ export default function ChatPage() {
   const newChatSession = () => {
     setCurrentSessionId(null);
     setMessages([]);
-    setTitle('New Chat');
-    localStorage.removeItem('hci-last-session');
-    if (inputRef.current) inputRef.current.focus();
+    setTitle("New Chat");
+    setExpandedReasoning(new Set());
+    setStreaming(false);
+    streamRef.current?.abort();
+    streamRef.current = null;
   };
 
   const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Delete this session?')) return;
+    if (!confirm("Delete this session?")) return;
     try {
       await api.del(`/api/sessions/${encodeURIComponent(sessionId)}`);
       if (currentSessionId === sessionId) newChatSession();
       loadSessions();
     } catch (err) {
-      setError('Failed to delete session');
+      setError("Failed to delete session");
     }
   };
 
@@ -180,18 +199,24 @@ export default function ChatPage() {
     const text = input.trim();
     if (!text || streaming) return;
 
-    setInput('');
-    setError('');
+    setInput("");
+    setError("");
 
-    const userMsg: Message = { role: 'user', content: text, timestamp: Date.now() };
+    const userMsg: Message = {
+      role: "user",
+      content: text,
+      timestamp: Date.now(),
+    };
     setMessages((prev) => [...prev, userMsg]);
 
-    const assistantMsg: Message = { role: 'assistant', content: '', timestamp: Date.now() };
+    const assistantMsg: Message = {
+      role: "assistant",
+      content: "",
+      timestamp: Date.now(),
+    };
     const assistantIdx = messages.length + 1;
     streamingMsgIndexRef.current = assistantIdx;
     setMessages((prev) => [...prev, assistantMsg]);
-    // Auto-expand reasoning so the user sees thinking arrive live
-    setExpandedReasoning((prev) => new Set(prev).add(assistantIdx));
     setStreaming(true);
     setElapsed(0);
 
@@ -210,73 +235,80 @@ export default function ChatPage() {
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Request failed' }));
+        const errData = await res
+          .json()
+          .catch(() => ({ error: "Request failed" }));
         throw new Error(errData.error || `HTTP ${res.status}`);
       }
 
       const reader = res.body?.getReader();
-      if (!reader) throw new Error('No response body');
+      if (!reader) throw new Error("No response body");
 
       const decoder = new TextDecoder();
-      let buffer = '';
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              if (data.type === 'reasoning') {
+              if (data.type === "reasoning") {
+                // Buffer reasoning during streaming — apply atomically at the end
+                reasoningBufferRef.current += (data.content || "");
+              } else if (data.type === "token") {
                 setMessages((prev) => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
-                  if (last && last.role === 'assistant') {
+                  if (last && last.role === "assistant") {
                     updated[updated.length - 1] = {
                       ...last,
-                      reasoning: (last.reasoning || '') + (data.content || ''),
+                      content: last.content + (data.content || ""),
                     };
                   }
                   return updated;
                 });
-              } else if (data.type === 'token') {
+              } else if (data.type === "done") {
+                if (data.sessionId) {
+                  setCurrentSessionId(data.sessionId);
+                  localStorage.setItem("hci-last-session", data.sessionId);
+                  loadSessions(true);
+                }
+                // Apply buffered reasoning + parse any remaining <think> tags atomically
                 setMessages((prev) => {
                   const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last && last.role === 'assistant') {
-                    const newContent = last.content + (data.content || '');
-                    // Continuously extract <think> blocks from streaming content
-                    // so reasoning appears live, not just at the end
-                    updated[updated.length - 1] = extractThinking({
-                      ...last,
-                      content: newContent,
-                    });
+                  const lastIdx = updated.length - 1;
+                  const last = updated[lastIdx];
+                  if (last && last.role === "assistant") {
+                    let msg = { ...last };
+                    if (reasoningBufferRef.current) {
+                      msg.reasoning = reasoningBufferRef.current;
+                    }
+                    msg = extractThinking(msg);
+                    updated[lastIdx] = msg;
                   }
                   return updated;
                 });
-              } else if (data.type === 'done') {
-                if (data.sessionId) {
-                  setCurrentSessionId(data.sessionId);
-                  localStorage.setItem('hci-last-session', data.sessionId);
-                  loadSessions();
-                }
-                // Post-stream: parse any remaining <think> tags from assistant messages
-                setMessages((prev) => prev.map(extractThinking));
-              } else if (data.type === 'error') {
-                setError(data.content || 'Stream error');
+                reasoningBufferRef.current = "";
+              } else if (data.type === "error") {
+                const errText = data.content || "Stream error";
+                // Silently drop CLI bookkeeping noise that leaks as errors
+                if (/session_id:/i.test(errText)) continue;
+                setError(errText);
               }
             } catch {}
           }
         }
       }
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        setError(err instanceof Error ? err.message : 'Failed to send message');
+      if ((err as Error).name !== "AbortError") {
+        setError(err instanceof Error ? err.message : "Failed to send message");
       }
     } finally {
       clearInterval(elapsedTimer);
@@ -291,6 +323,7 @@ export default function ChatPage() {
         });
         streamingMsgIndexRef.current = null;
       }
+      reasoningBufferRef.current = "";
     }
   };
 
@@ -303,7 +336,7 @@ export default function ChatPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
@@ -321,41 +354,51 @@ export default function ChatPage() {
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   const formatDate = (ts: number) => {
     const d = new Date(ts * 1000);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
-  // Render message content with basic formatting
-  const renderContent = (content: string) => {
-    if (!content) return '';
+  // ── helpers ─────────────────────────────────────────────────────────────────
+
+  /** Render message content with basic markdown-like formatting. */
+  function renderContent(content: string) {
+    if (!content) return "";
     // Escape HTML
     const escaped = content
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     // Code blocks
-    let rendered = escaped.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+    let rendered = escaped.replace(
+      /```(\w*)\n([\s\S]*?)```/g,
+      '<pre><code class="language-$1">$2</code></pre>',
+    );
     // Inline code
-    rendered = rendered.replace(/`([^`]+)`/g, '<code>$1</code>');
+    rendered = rendered.replace(/`([^`]+)`/g, "<code>$1</code>");
     // Bold
-    rendered = rendered.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    rendered = rendered.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     // Italic
-    rendered = rendered.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    rendered = rendered.replace(/\*([^*]+)\*/g, "<em>$1</em>");
     // Line breaks
-    rendered = rendered.replace(/\n/g, '<br />');
+    rendered = rendered.replace(/\n/g, "<br />");
     return rendered;
-  };
+  }
 
   return (
     <div className="flex h-full">
       {/* Sidebar */}
       {sidebarOpen && (
         <>
-          <div className="w-[280px] border-r bg-card flex flex-col shrink-0 h-full overflow-hidden">
+          <div className="w-xs border-r bg-card flex flex-col shrink-0 h-full overflow-hidden">
             <div className="p-2.5 border-b flex flex-col gap-1.5 shrink-0">
               <div className="flex gap-1.5 items-center">
                 <select
@@ -364,9 +407,14 @@ export default function ChatPage() {
                   className="flex-1 h-7 px-2 text-xs rounded-md border bg-muted/50 cursor-pointer"
                 >
                   {profiles.map((p) => (
-                    <option key={p.name} value={p.name}>{p.name}{p.active ? ' *' : ''}</option>
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                      {p.active ? " *" : ""}
+                    </option>
                   ))}
-                  {profiles.length === 0 && <option value="default">default</option>}
+                  {profiles.length === 0 && (
+                    <option value="default">default</option>
+                  )}
                 </select>
                 <Button
                   variant="ghost"
@@ -414,10 +462,10 @@ export default function ChatPage() {
                     key={session.id}
                     onClick={() => loadSessionMessages(session.id)}
                     className={cn(
-                      'px-2.5 py-2 cursor-pointer rounded-md mb-0.5 transition-colors',
+                      "px-2.5 py-2 cursor-pointer rounded-md mb-0.5 transition-colors",
                       currentSessionId === session.id
-                        ? 'bg-primary/10 border border-primary'
-                        : 'bg-transparent border border-transparent hover:bg-muted'
+                        ? "bg-primary/10 border border-primary"
+                        : "bg-transparent border border-transparent hover:bg-muted",
                     )}
                   >
                     <div className="flex justify-between items-start">
@@ -439,8 +487,9 @@ export default function ChatPage() {
                       </div>
                     )}
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                      {(session.messageCount || session.message_count || 0)} msgs
-                      {((session.startedAt || session.started_at)) && ` * ${formatDate(session.startedAt || session.started_at!)}`}
+                      {session.messageCount || session.message_count || 0} msgs
+                      {(session.startedAt || session.started_at) &&
+                        ` * ${formatDate(session.startedAt || session.started_at!)}`}
                     </div>
                   </div>
                 ))}
@@ -469,12 +518,7 @@ export default function ChatPage() {
                 <RiMenuLine className="size-3.5" />
               </Button>
             )}
-            <div>
-              <div className="text-sm font-medium">{title}</div>
-              <div className="text-[11px] text-muted-foreground">
-                {streaming ? 'Streaming...' : currentSessionId ? currentSessionId.slice(0, 20) : 'No session'}
-              </div>
-            </div>
+            <div className="text-sm font-medium">{title}</div>
           </div>
         </div>
 
@@ -491,76 +535,93 @@ export default function ChatPage() {
               <EmptyMedia variant="icon">
                 <RiMessage2Line className="size-4" />
               </EmptyMedia>
-              <EmptyDescription>Start a conversation with your Hermes agent</EmptyDescription>
+              <EmptyDescription>
+                Start a conversation with your Hermes agent
+              </EmptyDescription>
             </Empty>
           )}
           {messages.map((msg, idx) => {
             const isStreaming = streaming && idx === messages.length - 1;
             return (
-            <div
-              key={idx}
-              className={cn(
-                'flex flex-col max-w-[85%]',
-                msg.role === 'user' ? 'items-end self-end' : 'items-start self-start'
-              )}
-            >
-              {/* Thinking section: always visible during streaming, or when reasoning exists */}
-              {(msg.reasoning || isStreaming) && (
-                <div className="mb-0.5">
-                  <button
-                    onClick={() =>
-                      setExpandedReasoning((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(idx)) next.delete(idx);
-                        else next.add(idx);
-                        return next;
-                      })
-                    }
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none flex items-center gap-1"
+              <div
+                key={idx}
+                className={cn(
+                  "flex flex-col max-w-[85%]",
+                  msg.role === "user"
+                    ? "items-end self-end"
+                    : "items-start self-start",
+                )}
+              >
+                {/* Show bubble if there's content or reasoning */}
+                {(msg.content || msg.reasoning || isStreaming) && (
+                  <div
+                    className={cn(
+                      "px-3.5 py-2 rounded-lg border text-sm leading-relaxed break-words",
+                      msg.role === "user"
+                        ? "bg-primary/10 border-primary"
+                        : "bg-card border-border",
+                    )}
                   >
-                    <span className="text-amber-600 dark:text-amber-400 font-medium inline-flex items-center gap-0.5">
-                      {expandedReasoning.has(idx) ? <RiArrowDownSLine className="size-4" /> : <RiArrowRightSLine className="size-4" />}
-                      Thinking
-                    </span>
-                  </button>
-                  {expandedReasoning.has(idx) && (
-                    <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-muted-foreground/20 pl-3 leading-relaxed">
-                      {msg.reasoning || (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="inline-block size-2 rounded-full bg-amber-500 animate-pulse" />
-                          Thinking...
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Only show content bubble if there's actual content */}
-              {msg.content && (
-                <div
-                  className={cn(
-                    'px-3.5 py-2 rounded-lg border text-sm leading-relaxed break-words',
-                    msg.role === 'user'
-                      ? 'bg-primary/10 border-primary'
-                      : 'bg-card border-border'
-                  )}
-                  dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
-                />
-              )}
-              {msg.token_count && msg.role === 'assistant' && (
-                <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {msg.token_count} tokens
-                </div>
-              )}
-              {/* Inline streaming status for the last message */}
-              {isStreaming && (
-                <div className="flex items-center gap-1.5 text-muted-foreground text-xs mt-1">
-                  <span className="inline-block size-2 rounded-full bg-primary animate-pulse" />
-                  Streaming... ({formatTime(elapsed)})
-                </div>
-              )}
-            </div>
-          )})}
+                    {/* Thinking section inside the bubble */}
+                    {msg.reasoning && (
+                      <div className="mb-1">
+                        <button
+                          onClick={() =>
+                            setExpandedReasoning((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(idx)) next.delete(idx);
+                              else next.add(idx);
+                              return next;
+                            })
+                          }
+                          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none flex items-center gap-1"
+                        >
+                          <span className="text-muted-foreground font-medium inline-flex items-center gap-0.5">
+                            {expandedReasoning.has(idx) ? (
+                              <RiArrowDownSLine className="size-4" />
+                            ) : (
+                              <RiArrowRightSLine className="size-4" />
+                            )}
+                            Thinking
+                          </span>
+                        </button>
+                        {expandedReasoning.has(idx) && (
+                          <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-muted-foreground/20 pl-3 leading-relaxed">
+                            {msg.reasoning || (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="inline-block size-2 rounded-full bg-muted-foreground animate-pulse" />
+                                Thinking...
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Content */}
+                    {msg.content && (
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: renderContent(msg.content),
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+                {msg.token_count && msg.role === "assistant" && (
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {msg.token_count} tokens
+                  </div>
+                )}
+                {/* Inline streaming status for the last message */}
+                {isStreaming && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mt-1">
+                    <span className="inline-block size-2 rounded-full bg-primary animate-pulse" />
+                    Streaming... ({formatTime(elapsed)})
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <div ref={messagesEndRef} />
         </div>
@@ -572,21 +633,22 @@ export default function ChatPage() {
         )}
 
         {/* Input area */}
-        <div className="p-2.5 px-4 border-t bg-card flex gap-2 items-end">
-          <textarea
+        <div className="p-2.5 px-4 border-t bg-card flex gap-2 items-stretch">
+          <Textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message... (Enter to send)"
             rows={1}
-            className="flex-1 resize-none min-h-9 max-h-[120px] px-3 py-2 text-xs rounded-md border bg-muted/50 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 placeholder:text-muted-foreground"
+            className="flex-1 min-h-9 max-h-[120px]"
           />
           {streaming ? (
             <Button
               variant="destructive"
               size="sm"
               onClick={stopStream}
+              className="h-auto"
             >
               <RiStopFill className="size-3.5" />
               Stop
@@ -597,6 +659,7 @@ export default function ChatPage() {
               size="sm"
               onClick={sendMessage}
               disabled={!input.trim()}
+              className="h-auto"
             >
               <RiSendPlaneFill className="size-3.5" />
               Send

@@ -21,7 +21,7 @@ const fontMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hermes Control Interface",
+  title: "Hermes Dashboard",
   description: "Self-hosted web dashboard for the Hermes AI agent stack",
   icons: {
     icon: "/favicon.svg",

@@ -58,9 +58,9 @@ export default function Topbar() {
     <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-muted/50 px-3">
       {/* Logo */}
       <div className="flex shrink-0 items-center gap-2">
-        <img src="/hermes-icon.svg" alt="Hermes" className="size-6" />
+        <img src="/logo.png" alt="Hermes" className="size-6" />
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          Hermes Control Interface
+          Hermes Dashboard
         </span>
       </div>
 

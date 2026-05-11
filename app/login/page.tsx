@@ -65,7 +65,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-muted">
             <RiLockLine className="size-6 text-primary" />
           </div>
-          <CardTitle>Hermes Control Interface</CardTitle>
+          <CardTitle>Hermes Dashboard</CardTitle>
           <CardDescription>Enter credentials to continue</CardDescription>
         </CardHeader>
         <CardContent>

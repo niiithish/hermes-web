@@ -85,7 +85,7 @@ export default function SetupPage() {
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
             <RiUserAddLine className="size-6 text-primary" />
           </div>
-          <CardTitle>Hermes Control Interface</CardTitle>
+          <CardTitle>Hermes Dashboard</CardTitle>
           <CardDescription>First run — create admin account</CardDescription>
         </CardHeader>
         <CardContent>
