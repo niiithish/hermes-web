@@ -335,8 +335,8 @@ export default function ChatPage() {
       {/* Sidebar */}
       {sidebarOpen && (
         <>
-          <div className="w-[280px] border-r bg-card flex flex-col shrink-0">
-            <div className="p-2.5 border-b flex flex-col gap-1.5">
+          <div className="w-[280px] border-r bg-card flex flex-col shrink-0 h-full overflow-hidden">
+            <div className="p-2.5 border-b flex flex-col gap-1.5 shrink-0">
               <div className="flex gap-1.5 items-center">
                 <select
                   value={selectedProfile}
@@ -373,61 +373,63 @@ export default function ChatPage() {
                 New Chat
               </Button>
             </div>
-            <ScrollArea className="flex-1 p-1">
-              {loadingSessions && (
-                <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground text-xs">
-                  <Spinner className="size-3.5" />
-                  Loading sessions...
-                </div>
-              )}
-              {!loadingSessions && filteredSessions.length === 0 && (
-                <Empty>
-                  <EmptyMedia variant="icon">
-                    <RiHistoryLine className="size-4" />
-                  </EmptyMedia>
-                  <EmptyDescription>No sessions yet</EmptyDescription>
-                </Empty>
-              )}
-              {filteredSessions.map((session) => (
-                <div
-                  key={session.id}
-                  onClick={() => loadSessionMessages(session.id)}
-                  className={cn(
-                    'px-2.5 py-2 cursor-pointer rounded-md mb-0.5 transition-colors',
-                    currentSessionId === session.id
-                      ? 'bg-primary/10 border border-primary'
-                      : 'bg-transparent border border-transparent hover:bg-muted'
-                  )}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="text-xs font-medium flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {session.title || session.id.slice(0, 16)}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(e) => deleteSession(session.id, e)}
-                      className="opacity-40 hover:opacity-100 -mr-1"
-                    >
-                      <RiCloseLine className="size-2.5" />
-                    </Button>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-1">
+                {loadingSessions && (
+                  <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground text-xs">
+                    <Spinner className="size-3.5" />
+                    Loading sessions...
                   </div>
-                  {session.preview && (
-                    <div className="text-[11px] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap mt-0.5">
-                      {session.preview}
+                )}
+                {!loadingSessions && filteredSessions.length === 0 && (
+                  <Empty>
+                    <EmptyMedia variant="icon">
+                      <RiHistoryLine className="size-4" />
+                    </EmptyMedia>
+                    <EmptyDescription>No sessions yet</EmptyDescription>
+                  </Empty>
+                )}
+                {filteredSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    onClick={() => loadSessionMessages(session.id)}
+                    className={cn(
+                      'px-2.5 py-2 cursor-pointer rounded-md mb-0.5 transition-colors',
+                      currentSessionId === session.id
+                        ? 'bg-primary/10 border border-primary'
+                        : 'bg-transparent border border-transparent hover:bg-muted'
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="text-xs font-medium flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {session.title || session.id.slice(0, 16)}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={(e) => deleteSession(session.id, e)}
+                        className="opacity-40 hover:opacity-100 -mr-1"
+                      >
+                        <RiCloseLine className="size-2.5" />
+                      </Button>
                     </div>
-                  )}
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {(session.messageCount || session.message_count || 0)} msgs
-                    {((session.startedAt || session.started_at)) && ` * ${formatDate(session.startedAt || session.started_at!)}`}
+                    {session.preview && (
+                      <div className="text-[11px] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap mt-0.5">
+                        {session.preview}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                      {(session.messageCount || session.message_count || 0)} msgs
+                      {((session.startedAt || session.started_at)) && ` * ${formatDate(session.startedAt || session.started_at!)}`}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </ScrollArea>
           </div>
           {/* Mobile backdrop */}
           <div
-            className="chat-sidebar-backdrop"
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         </>

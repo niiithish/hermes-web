@@ -1,13 +1,26 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { api } from '@/app/lib/api-client';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { api } from "@/app/lib/api-client";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,16 +43,24 @@ interface Profile {
 // ─── Parse CLI box-drawing table output ──────────────────────────────────────
 
 function parseSkillTable(output: string): Skill[] {
-  const text = String(output || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-  const lines = text.split('\n');
+  const text = String(output || "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+  const lines = text.split("\n");
   const skills: Skill[] = [];
-  const rowPattern = /[│┃]\s*([^│┃\s][^│┃]*?)\s*[│┃]\s*([^│┃]*?)\s*[│┃]\s*(\S+)\s*[│┃]\s*(\S+)\s*[│┃]\s*([^│┃]*?)\s*[│┃]/;
+  const rowPattern =
+    /[│┃]\s*([^│┃\s][^│┃]*?)\s*[│┃]\s*([^│┃]*?)\s*[│┃]\s*(\S+)\s*[│┃]\s*(\S+)\s*[│┃]\s*([^│┃]*?)\s*[│┃]/;
   for (const line of lines) {
-    if (line.includes('┏') || line.includes('┗') || line.includes('┡') || line.includes('┩') || line.includes('╍')) continue;
+    if (
+      line.includes("┏") ||
+      line.includes("┗") ||
+      line.includes("┡") ||
+      line.includes("┩") ||
+      line.includes("╍")
+    )
+      continue;
     const match = line.match(rowPattern);
     if (match) {
       const name = match[1].trim();
-      if (!name || name === 'Name' || name === '#') continue;
+      if (!name || name === "Name" || name === "#") continue;
       skills.push({
         name,
         description: match[2].trim(),
@@ -53,17 +74,26 @@ function parseSkillTable(output: string): Skill[] {
 }
 
 function parseBrowseTable(output: string): Skill[] {
-  const text = String(output || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-  const lines = text.split('\n');
+  const text = String(output || "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+  const lines = text.split("\n");
   const skills: Skill[] = [];
   for (const line of lines) {
-    if (line.includes('┏') || line.includes('┗') || line.includes('┡') || line.includes('┩') || line.includes('╍')) continue;
-    const match = line.match(/[│|]\s*(\d+)\s*[│|]\s*([^\s│|]+)\s*[│|]\s*(.{10,}?)\s*[│|]\s*(\S+)\s*[│|]\s*(.+?)\s*[│|]/);
+    if (
+      line.includes("┏") ||
+      line.includes("┗") ||
+      line.includes("┡") ||
+      line.includes("┩") ||
+      line.includes("╍")
+    )
+      continue;
+    const match = line.match(
+      /[│|]\s*(\d+)\s*[│|]\s*([^\s│|]+)\s*[│|]\s*(.{10,}?)\s*[│|]\s*(\S+)\s*[│|]\s*(.+?)\s*[│|]/,
+    );
     if (match) {
       skills.push({
         num: match[1],
         name: match[2].trim(),
-        description: match[3].trim().replace(/\.\.\.$/, ''),
+        description: match[3].trim().replace(/\.\.\.$/, ""),
         source: match[4].trim(),
         trust: match[5].trim(),
       });
@@ -80,23 +110,25 @@ export default function SkillsPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [installedSkills, setInstalledSkills] = useState<Set<string>>(new Set());
+  const [installedSkills, setInstalledSkills] = useState<Set<string>>(
+    new Set(),
+  );
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
   // Inspect dialog
   const [inspectTarget, setInspectTarget] = useState<string | null>(null);
-  const [inspectOutput, setInspectOutput] = useState<string>('');
+  const [inspectOutput, setInspectOutput] = useState<string>("");
   const [inspectLoading, setInspectLoading] = useState(false);
   const [inspectError, setInspectError] = useState<string | null>(null);
 
   // Install dialog
   const [installTarget, setInstallTarget] = useState<string | null>(null);
-  const [installStatus, setInstallStatus] = useState<string>('');
+  const [installStatus, setInstallStatus] = useState<string>("");
   const [installLoading, setInstallLoading] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState("");
 
   // ── Load profiles & installed skills ──────────────────────────────────────
 
@@ -104,30 +136,40 @@ export default function SkillsPage() {
     let cancelled = false;
     async function init() {
       try {
-        const profRes = await api.get<{ ok: boolean; profiles: Profile[] }>('/api/profiles');
+        const profRes = await api.get<{ ok: boolean; profiles: Profile[] }>(
+          "/api/profiles",
+        );
         if (!cancelled && profRes.ok && profRes.profiles) {
           setProfiles(profRes.profiles);
-          const activeProfile = profRes.profiles.find(p => p.active);
-          const profileName = activeProfile?.name || 'default';
+          const activeProfile = profRes.profiles.find((p) => p.active);
+          const profileName = activeProfile?.name || "default";
           setSelectedProfile(profileName);
 
           try {
-            const instRes = await api.get<{ ok: boolean; output: string }>(`/api/skills/list/${encodeURIComponent(profileName)}`);
+            const instRes = await api.get<{ ok: boolean; output: string }>(
+              `/api/skills/list/${encodeURIComponent(profileName)}`,
+            );
             if (!cancelled && instRes.ok && instRes.output) {
               const names = new Set<string>();
-              const lines = instRes.output.split('\n');
+              const lines = instRes.output.split("\n");
               for (const line of lines) {
                 const match = line.match(/[│┃]\s*([^\s│┃][^\s│┃]*)\s*[│┃]/);
                 if (match) names.add(match[1].trim());
               }
               setInstalledSkills(names);
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ── Load page ─────────────────────────────────────────────────────────────
@@ -138,13 +180,17 @@ export default function SkillsPage() {
     setIsSearching(false);
     setCurrentPage(page);
     try {
-      const res = await api.get<{ ok: boolean; error?: string; output?: string }>(`/api/skills/browse/${page}`);
+      const res = await api.get<{
+        ok: boolean;
+        error?: string;
+        output?: string;
+      }>(`/api/skills/browse/${page}`);
       if (!res.ok) {
-        setError(res.error || 'Failed to load skills');
+        setError(res.error || "Failed to load skills");
         setSkills([]);
         return;
       }
-      const output = res.output || '';
+      const output = res.output || "";
       const pageMatch = output.match(/page (\d+)\/(\d+)/i);
       if (pageMatch) {
         setCurrentPage(parseInt(pageMatch[1]));
@@ -152,61 +198,81 @@ export default function SkillsPage() {
       }
       setSkills(parseBrowseTable(output));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load skills');
+      setError(e instanceof Error ? e.message : "Failed to load skills");
       setSkills([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadPage(1); }, [loadPage]);
+  useEffect(() => {
+    loadPage(1);
+  }, [loadPage]);
 
   // ── Search handler ────────────────────────────────────────────────────────
 
-  const handleSearchInput = useCallback((value: string) => {
-    setSearchQuery(value);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (value.trim().length < 2) {
-      setIsSearching(false);
-      loadPage(1);
-      return;
-    }
-    searchTimerRef.current = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      setIsSearching(true);
-      try {
-        const res = await api.get<{ ok: boolean; error?: string; output?: string }>(`/api/skills/search/${encodeURIComponent(value.trim())}`);
-        if (res.ok && res.output) {
-          setSkills(parseSkillTable(res.output));
-        } else {
-          setError(res.error || 'Search failed');
-          setSkills([]);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Search failed');
-        setSkills([]);
-      } finally {
-        setLoading(false);
+  const handleSearchInput = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (value.trim().length < 2) {
+        setIsSearching(false);
+        loadPage(1);
+        return;
       }
-    }, 350);
-  }, [loadPage]);
+      searchTimerRef.current = setTimeout(async () => {
+        setLoading(true);
+        setError(null);
+        setIsSearching(true);
+        try {
+          const res = await api.get<{
+            ok: boolean;
+            error?: string;
+            output?: string;
+          }>(`/api/skills/search/${encodeURIComponent(value.trim())}`);
+          if (res.ok && res.output) {
+            setSkills(parseSkillTable(res.output));
+          } else {
+            setError(res.error || "Search failed");
+            setSkills([]);
+          }
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Search failed");
+          setSkills([]);
+        } finally {
+          setLoading(false);
+        }
+      }, 350);
+    },
+    [loadPage],
+  );
 
-  useEffect(() => () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    },
+    [],
+  );
 
   // ── Inspect ───────────────────────────────────────────────────────────────
 
   const handleInspect = useCallback(async (name: string) => {
     setInspectTarget(name);
-    setInspectOutput('');
+    setInspectOutput("");
     setInspectError(null);
     setInspectLoading(true);
     try {
-      const res = await api.get<{ ok: boolean; error?: string; output?: string }>(`/api/skills/inspect/${encodeURIComponent(name)}`);
-      if (res.ok) setInspectOutput(res.output || '');
-      else setInspectError(res.error || 'Failed to load preview');
+      const res = await api.get<{
+        ok: boolean;
+        error?: string;
+        output?: string;
+      }>(`/api/skills/inspect/${encodeURIComponent(name)}`);
+      if (res.ok) setInspectOutput(res.output || "");
+      else setInspectError(res.error || "Failed to load preview");
     } catch (e) {
-      setInspectError(e instanceof Error ? e.message : 'Failed to load preview');
+      setInspectError(
+        e instanceof Error ? e.message : "Failed to load preview",
+      );
     } finally {
       setInspectLoading(false);
     }
@@ -214,40 +280,53 @@ export default function SkillsPage() {
 
   // ── Install ───────────────────────────────────────────────────────────────
 
-  const handleInstall = useCallback((name: string) => {
-    setInstallTarget(name);
-    setInstallStatus('');
-    setInstallLoading(false);
-    const activeProfile = profiles.find(p => p.active);
-    if (activeProfile) setSelectedProfile(activeProfile.name);
-  }, [profiles]);
+  const handleInstall = useCallback(
+    (name: string) => {
+      setInstallTarget(name);
+      setInstallStatus("");
+      setInstallLoading(false);
+      const activeProfile = profiles.find((p) => p.active);
+      if (activeProfile) setSelectedProfile(activeProfile.name);
+    },
+    [profiles],
+  );
 
   const doInstall = useCallback(async () => {
     if (!installTarget) return;
     setInstallLoading(true);
-    setInstallStatus('');
+    setInstallStatus("");
     try {
-      const res = await api.post<{ ok: boolean; error?: string; output?: string }>('/api/skills/install', {
+      const res = await api.post<{
+        ok: boolean;
+        error?: string;
+        output?: string;
+      }>("/api/skills/install", {
         skill: installTarget,
         profile: selectedProfile,
       });
       if (res.ok) {
-        setInstallStatus(`Installed to ${selectedProfile || 'default'}!`);
-        setInstalledSkills(prev => new Set(prev).add(installTarget));
-        setTimeout(() => { setInstallTarget(null); setInstallStatus(''); }, 1500);
+        setInstallStatus(`Installed to ${selectedProfile || "default"}!`);
+        setInstalledSkills((prev) => new Set(prev).add(installTarget));
+        setTimeout(() => {
+          setInstallTarget(null);
+          setInstallStatus("");
+        }, 1500);
       } else {
-        setInstallStatus(res.output || res.error || 'Install failed');
+        setInstallStatus(res.output || res.error || "Install failed");
       }
     } catch (e) {
-      setInstallStatus(e instanceof Error ? e.message : 'Install failed');
+      setInstallStatus(e instanceof Error ? e.message : "Install failed");
     } finally {
       setInstallLoading(false);
     }
   }, [installTarget, selectedProfile]);
 
-  const isInstalled = useCallback((skill: Skill) => {
-    return installedSkills.has(skill.identifier || skill.name);
-  }, [installedSkills]);
+  const isInstalled = useCallback(
+    (skill: Skill) => {
+      return installedSkills.has(skill.identifier || skill.name);
+    },
+    [installedSkills],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -256,17 +335,23 @@ export default function SkillsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-xl font-bold tracking-wider uppercase">Skills Hub</h1>
-          <p className="text-sm text-muted-foreground mt-1">Browse, install, and manage skills</p>
+          <h1 className="text-xl font-bold tracking-wider uppercase">
+            Skills Hub
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Browse, install, and manage skills
+          </p>
         </div>
         <div className="flex gap-2 items-center">
           <Input
             placeholder="Search skills..."
             value={searchQuery}
-            onChange={e => handleSearchInput(e.target.value)}
+            onChange={(e) => handleSearchInput(e.target.value)}
             className="w-56"
           />
-          <Button variant="outline" onClick={() => loadPage(currentPage)}>Refresh</Button>
+          <Button variant="outline" onClick={() => loadPage(currentPage)}>
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -277,15 +362,17 @@ export default function SkillsPage() {
       {loading && (
         <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
           <Spinner className="size-4" />
-          {isSearching ? 'Searching...' : `Loading page ${currentPage}...`}
+          {isSearching ? "Searching..." : `Loading page ${currentPage}...`}
         </div>
       )}
 
       {/* Empty */}
       {!loading && !error && skills.length === 0 && (
-        <Card className="items-center justify-center py-10 text-muted-foreground">
+        <Card className="items-center justify-center py-10">
           <CardContent>
-            {isSearching ? `No skills found for "${searchQuery}"` : `No skills found on page ${currentPage}`}
+            {isSearching
+              ? `No skills found for "${searchQuery}"`
+              : `No skills found on page ${currentPage}`}
           </CardContent>
         </Card>
       )}
@@ -311,17 +398,31 @@ export default function SkillsPage() {
                   <CardDescription>{s.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex gap-1.5 items-center flex-wrap">
-                  <Badge variant={s.source === 'official' ? 'default' : 'outline'}>{s.source}</Badge>
+                  <Badge
+                    variant={s.source === "official" ? "default" : "outline"}
+                  >
+                    {s.source}
+                  </Badge>
                   {s.trust && <Badge variant="secondary">{s.trust}</Badge>}
                 </CardContent>
                 <CardFooter className="gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleInspect(s.identifier || s.name)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleInspect(s.identifier || s.name)}
+                  >
                     Preview
                   </Button>
                   {installed ? (
-                    <Button variant="outline" size="sm" disabled>Installed</Button>
+                    <Button variant="outline" size="sm" disabled>
+                      Installed
+                    </Button>
                   ) : (
-                    <Button variant="default" size="sm" onClick={() => handleInstall(s.identifier || s.name)}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleInstall(s.identifier || s.name)}
+                    >
                       Install
                     </Button>
                   )}
@@ -352,7 +453,10 @@ export default function SkillsPage() {
       )}
 
       {/* Inspect Dialog */}
-      <Dialog open={!!inspectTarget} onOpenChange={open => !open && setInspectTarget(null)}>
+      <Dialog
+        open={!!inspectTarget}
+        onOpenChange={(open) => !open && setInspectTarget(null)}
+      >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{inspectTarget}</DialogTitle>
@@ -369,9 +473,22 @@ export default function SkillsPage() {
             </pre>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInspectTarget(null)}>Close</Button>
-            {!isInstalled({ name: inspectTarget || '', description: '', source: '', trust: '' }) && (
-              <Button variant="default" onClick={() => { setInspectTarget(null); handleInstall(inspectTarget!); }}>
+            <Button variant="outline" onClick={() => setInspectTarget(null)}>
+              Close
+            </Button>
+            {!isInstalled({
+              name: inspectTarget || "",
+              description: "",
+              source: "",
+              trust: "",
+            }) && (
+              <Button
+                variant="default"
+                onClick={() => {
+                  setInspectTarget(null);
+                  handleInstall(inspectTarget!);
+                }}
+              >
                 Install
               </Button>
             )}
@@ -380,54 +497,83 @@ export default function SkillsPage() {
       </Dialog>
 
       {/* Install Dialog */}
-      <Dialog open={!!installTarget} onOpenChange={open => !open && setInstallTarget(null)}>
+      <Dialog
+        open={!!installTarget}
+        onOpenChange={(open) => !open && setInstallTarget(null)}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Install: {installTarget}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">Select agent profile</label>
+            <label className="text-xs text-muted-foreground">
+              Select agent profile
+            </label>
             <div className="flex flex-col gap-1">
-              {profiles.length > 0 ? profiles.map(p => (
-                <label
-                  key={p.name}
-                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
-                    selectedProfile === p.name
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-card'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="install-profile"
-                    value={p.name}
-                    checked={selectedProfile === p.name}
-                    onChange={e => setSelectedProfile(e.target.value)}
-                    className="accent-primary"
-                  />
-                  <span className="font-semibold text-sm">{p.name}</span>
-                  {p.alias && p.alias !== p.name && (
-                    <span className="text-muted-foreground text-xs">({p.alias})</span>
-                  )}
-                  {p.active && <Badge variant="default" className="text-[9px]">active</Badge>}
-                  <span className="text-muted-foreground text-xs ml-auto">{p.model || ''}</span>
-                </label>
-              )) : (
-                <div className="text-muted-foreground p-3">No profiles found</div>
+              {profiles.length > 0 ? (
+                profiles.map((p) => (
+                  <label
+                    key={p.name}
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
+                      selectedProfile === p.name
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-card"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="install-profile"
+                      value={p.name}
+                      checked={selectedProfile === p.name}
+                      onChange={(e) => setSelectedProfile(e.target.value)}
+                      className="accent-primary"
+                    />
+                    <span className="font-semibold text-sm">{p.name}</span>
+                    {p.alias && p.alias !== p.name && (
+                      <span className="text-muted-foreground text-xs">
+                        ({p.alias})
+                      </span>
+                    )}
+                    {p.active && (
+                      <Badge variant="default" className="text-[9px]">
+                        active
+                      </Badge>
+                    )}
+                    <span className="text-muted-foreground text-xs ml-auto">
+                      {p.model || ""}
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <div className="text-muted-foreground p-3">
+                  No profiles found
+                </div>
               )}
             </div>
           </div>
 
           {installStatus && (
-            <div className={`text-sm py-2 ${installStatus.startsWith('Installed') ? 'text-green-500' : 'text-destructive'}`}>
+            <div
+              className={`text-sm py-2 ${installStatus.startsWith("Installed") ? "text-green-500" : "text-destructive"}`}
+            >
               {installStatus}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInstallTarget(null)} disabled={installLoading}>Cancel</Button>
-            <Button variant="default" onClick={doInstall} disabled={installLoading || !selectedProfile}>
-              {installLoading ? 'Installing...' : 'Install'}
+            <Button
+              variant="outline"
+              onClick={() => setInstallTarget(null)}
+              disabled={installLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={doInstall}
+              disabled={installLoading || !selectedProfile}
+            >
+              {installLoading ? "Installing..." : "Install"}
             </Button>
           </DialogFooter>
         </DialogContent>
