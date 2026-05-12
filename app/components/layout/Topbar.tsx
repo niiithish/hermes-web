@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { id: 'usage', label: 'Usage', path: '/usage' },
   { id: 'skills', label: 'Skills', path: '/skills' },
   { id: 'chat', label: 'Chat', path: '/chat' },
+  { id: 'boards', label: 'Boards', path: '/boards' },
   { id: 'logs', label: 'Logs', path: '/logs' },
   { id: 'mon', label: 'Monitor', path: '/mon' },
   { id: 'maintenance', label: 'Maintenance', path: '/maintenance' },

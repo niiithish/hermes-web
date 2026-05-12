@@ -91,6 +91,9 @@ export default function ChatPage() {
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(
     new Set(),
   );
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(
+    new Set(),
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -671,22 +674,58 @@ export default function ChatPage() {
                 {(msg.content || msg.reasoning || isStreaming) && (
                   <div
                     className={cn(
-                      "px-3.5 py-2 rounded-lg border text-sm leading-relaxed break-words",
-                      msg.role === "user"
-                        ? "bg-primary/10 border-primary"
-                        : "bg-card border-border",
+                      "leading-relaxed break-words",
+                      msg.role === "user" &&
+                        "px-3.5 py-2 rounded-lg border text-sm bg-primary/10 border-primary",
+                      msg.role === "tool" &&
+                        "px-2 py-1 text-[11px] text-muted-foreground/70 font-mono bg-transparent border-0",
+                      msg.role !== "user" &&
+                        msg.role !== "tool" &&
+                        "px-3.5 py-2 rounded-lg border text-sm bg-card border-border",
                     )}
                   >
-                    {/* Thinking section inside the bubble */}
-                    {/* During streaming with no reasoning yet but content is buffered,
-                        show a stable placeholder so the bubble doesn't jump later. */}
-                    {isStreaming && !msg.reasoning && !msg.content && (
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
-                        <span className="inline-block size-2 rounded-full bg-muted-foreground animate-pulse" />
-                        Thinking...
+                    {/* Tool call — collapsed by default */}
+                    {msg.role === "tool" && msg.content && (
+                      <div>
+                        <button
+                          onClick={() =>
+                            setExpandedTools((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(idx)) next.delete(idx);
+                              else next.add(idx);
+                              return next;
+                            })
+                          }
+                          className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer select-none flex items-center gap-0.5 font-mono"
+                        >
+                          {expandedTools.has(idx) ? (
+                            <RiArrowDownSLine className="size-3.5" />
+                          ) : (
+                            <RiArrowRightSLine className="size-3.5" />
+                          )}
+                          tool call
+                        </button>
+                        {expandedTools.has(idx) && (
+                          <div className="mt-1 text-[11px] text-muted-foreground/70 font-mono whitespace-pre-wrap break-words border-l-2 border-muted-foreground/10 pl-2">
+                            {msg.content}
+                          </div>
+                        )}
                       </div>
                     )}
-                    {msg.reasoning && (
+
+                    {msg.role !== "tool" && (
+                      <>
+                        {/* Thinking section inside the bubble */}
+                        {/* During streaming with no reasoning yet but content is buffered,
+                            show a stable placeholder so the bubble doesn't jump later. */}
+                        {isStreaming && !msg.reasoning && !msg.content && (
+                          <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse" />
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.2s]" />
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.4s]" />
+                          </div>
+                        )}
+                        {msg.reasoning && (
                       <div className="mb-1">
                         <button
                           onClick={() =>
@@ -711,9 +750,10 @@ export default function ChatPage() {
                         {expandedReasoning.has(idx) && (
                           <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-muted-foreground/20 pl-3 leading-relaxed">
                             {msg.reasoning || (
-                              <span className="inline-flex items-center gap-1.5">
-                                <span className="inline-block size-2 rounded-full bg-muted-foreground animate-pulse" />
-                                Thinking...
+                              <span className="inline-flex items-center gap-1">
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse" />
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.2s]" />
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.4s]" />
                               </span>
                             )}
                           </div>
@@ -740,6 +780,8 @@ export default function ChatPage() {
                         />
                       );
                     })()}
+                      </>
+                    )}
                   </div>
                 )}
                 {msg.token_count && msg.role === "assistant" && (

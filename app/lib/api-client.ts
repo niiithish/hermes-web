@@ -246,6 +246,10 @@ class ApiClient {
   async del<T = unknown>(path: string): Promise<T> {
     return this.request<T>('DELETE', path);
   }
+
+  async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PATCH', path, body);
+  }
 }
 
 export class ApiError extends Error {

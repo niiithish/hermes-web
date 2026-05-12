@@ -319,8 +319,8 @@ export default function LogsPage() {
       items[items.length - 1].count = count;
     }
 
-    // Reverse to show newest first
-    return items.reverse();
+    // Show oldest first (newest at bottom — natural terminal order)
+    return items;
   }, [logs]);
 
   // --- Derived: stats ---

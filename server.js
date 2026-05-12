@@ -32,14 +32,14 @@ const FREE_MODELS = new Set([
 
 // Hermes billing_provider → genai-prices providerId mapping
 const PROVIDER_MAP = {
-  'openrouter':    'openrouter',
-  'openai-codex':  'openai',
-  'opencode-go':   'openrouter', // minimax available via OpenRouter pricing
+  'openrouter': 'openrouter',
+  'openai-codex': 'openai',
+  'opencode-go': 'openrouter', // minimax available via OpenRouter pricing
 };
 
 // Custom pricing for models not in genai-prices (per million tokens)
 const CUSTOM_PRICING = {
-  'minimax-m2':   { input_mtok: 0.30, output_mtok: 1.20, cache_read_mtok: 0.03 },
+  'minimax-m2': { input_mtok: 0.30, output_mtok: 1.20, cache_read_mtok: 0.03 },
   'minimax-m2.7': { input_mtok: 0.30, output_mtok: 1.20, cache_read_mtok: 0.03 },
 };
 
@@ -135,12 +135,12 @@ function stripAnsi(text) {
 // ── Load HCI config (hci.config.yaml + env overrides) ──
 const cfg = getConfig();
 
-const PORT            = cfg.port;
+const PORT = cfg.port;
 const CONTROL_PASSWORD = cfg.password;  // may be null (first-run / multi-user auth)
-const CONTROL_SECRET  = cfg.secret || crypto.randomBytes(32).toString('hex');
-const AUTH_COOKIE      = cfg.session.cookieName;
-const PROJECT_ROOT     = __dirname;
-const PROJECTS_ROOT    = cfg.projectsRoot;
+const CONTROL_SECRET = cfg.secret || crypto.randomBytes(32).toString('hex');
+const AUTH_COOKIE = cfg.session.cookieName;
+const PROJECT_ROOT = __dirname;
+const PROJECTS_ROOT = cfg.projectsRoot;
 
 // Dynamic identity — works for root and non-root users
 const HCI_USER = os.userInfo().username;
@@ -184,7 +184,8 @@ const IGNORED_DIRS = new Set([
 
 const app = express();
 
-// Security headers — safe config (no HSTS, CSP allows Google Fonts)
+// Security headers — DISABLED for local development & agent browser compatibility.
+// Re-enable in production by uncommenting the helmet block below.
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -251,9 +252,9 @@ function findPluginManifests() {
             } catch (e) { log('plugin.parse', `Failed to parse ${manifestPath}: ${e.message}`); }
           }
         }
-      } catch {}
+      } catch { }
     }
-  } catch {}
+  } catch { }
   return manifests;
 }
 
@@ -302,7 +303,7 @@ function loadGatewayApiKey() {
       const cfg = yaml.load(fs.readFileSync(configPath, 'utf8'));
       return cfg?.platforms?.api_server?.extra?.key || '';
     }
-  } catch {}
+  } catch { }
   return '';
 }
 
@@ -387,7 +388,7 @@ async function probeGatewayHealth(profile) {
         const data = await res.json().catch(() => ({}));
         return { ok: data.status === 'ok' || res.status === 200, managedBy: 'api', port: gatewayPorts[profile] || gatewayPorts['default'] };
       }
-    } catch {}
+    } catch { }
   }
   // Fallback: check systemctl
   try {
@@ -395,7 +396,7 @@ async function probeGatewayHealth(profile) {
     const svc = `hermes-gateway${profile !== 'default' ? `-${profile}` : ''}`;
     const check = await shell(`systemctl ${SYSTEMD_USER_FLAG} is-active ${svc} 2>/dev/null || echo inactive`);
     if (check.trim() === 'active') return { ok: true, managedBy: 'systemd' };
-  } catch {}
+  } catch { }
   return { ok: false, managedBy: base ? 'api' : 'unknown' };
 }
 
@@ -491,7 +492,7 @@ app.post('/api/gateway/responses', requireAuth, requirePerm('chat.use'), async (
     // Client abort → cancel gateway stream
     req.on('close', () => {
       aborted = true;
-      webReader.cancel().catch(() => {});
+      webReader.cancel().catch(() => { });
     });
 
     // Pipe chunks from Gateway to client
@@ -583,7 +584,7 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
 
       let output = '';
       let reasoningAccum = '';
-      let i =0;
+      let i = 0;
 
       while (i < thinkBuffer.length) {
         const openIdx = thinkBuffer.indexOf('<think>', i);
@@ -656,7 +657,7 @@ app.post('/api/chat/send', requireAuth, requirePerm('chat.use'), async (req, res
       }
       // Extract real hermes session ID from output (use raw fullResponse)
       const sidMatch = fullResponse.match(/session_id:\s*([0-9]{8}_[0-9]{6}_[a-f0-9]+)/i)
-                   || fullResponse.match(/Session:\s+([0-9]{8}_[0-9]{6}_[a-f0-9]+)/i);
+        || fullResponse.match(/Session:\s+([0-9]{8}_[0-9]{6}_[a-f0-9]+)/i);
       const newSessionId = sidMatch ? sidMatch[1] : sessionId || '';
       res.write(`data: ${JSON.stringify({ type: 'done', sessionId: newSessionId, elapsed: parseFloat(elapsed) })}\n\n`);
       res.end();
@@ -827,11 +828,11 @@ app.get('/api/models', requireAuth, async (req, res) => {
     const configPath = path.join(os.homedir(), '.hermes', 'config.yaml');
     const configContent = await fs.promises.readFile(configPath, 'utf-8');
     const config = yaml.load(configContent) || {};
-    
+
     const modelConfig = config.model || {};
     const defaultModel = modelConfig.default || 'unknown';
     const provider = modelConfig.provider || 'unknown';
-    
+
     // Return single model info (hermes doesn't expose full model list via CLI)
     res.json({
       ok: true,
@@ -903,7 +904,7 @@ function writeAvatarOverride(dataUrl) {
 
 function clearAvatarOverride() {
   avatarDataUrlCache = null;
-  try { fs.unlinkSync(AVATAR_OVERRIDE_PATH); } catch {}
+  try { fs.unlinkSync(AVATAR_OVERRIDE_PATH); } catch { }
 }
 
 function getAvatarDataUrl() {
@@ -1087,7 +1088,7 @@ function startLogStream(logType, level, socket) {
 
 function stopLogStream() {
   if (logStream.proc) {
-    try { logStream.proc.kill('SIGTERM'); } catch {}
+    try { logStream.proc.kill('SIGTERM'); } catch { }
     logStream.proc = null;
   }
   logStream.clients.clear();
@@ -1554,7 +1555,7 @@ async function getAllSessions(profile) {
       hermesAllSessionsCache = { at: now, data, key: cacheKey };
       return data;
     }
-  } catch {}
+  } catch { }
 
   // No fallback to old cache — return empty if command returned nothing
   return [];
@@ -1735,7 +1736,7 @@ function extractConfigSummary() {
   try {
     raw = fs.readFileSync(configPath, 'utf8');
     config = yaml.load(raw) || {};
-  } catch {}
+  } catch { }
   const model = config.model || {};
   const defaultModel = model.default || 'unknown';
   const provider = model.provider || 'unknown';
@@ -1755,7 +1756,7 @@ function getSkills() {
       for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
         if (entry.isDirectory()) skills.add(entry.name);
       }
-    } catch {}
+    } catch { }
   }
   return Array.from(skills).sort();
 }
@@ -1814,7 +1815,7 @@ async function buildDashboardState(authed = false) {
       getInsights(),
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
     ]);
-  } catch {}
+  } catch { }
   return {
     title: 'Hermes Control Interface',
     now: new Date().toISOString(),
@@ -2450,7 +2451,7 @@ async function getProfiles() {
         ? fs.readFileSync(activeProfilePath, 'utf8').trim()
         : 'default';
       data.forEach(p => { p.active = p.name === actualActive; });
-    } catch {}
+    } catch { }
     console.log('[DEBUG getProfiles] parsed:', JSON.stringify(data));
     getProfiles.cache = { at: now, data };
     return data;
@@ -2501,7 +2502,7 @@ app.get('/api/gateway/:profile', requireAuth, async (req, res) => {
   try {
     // Probe API health first, systemctl as fallback
     const probe = await probeGatewayHealth(profile);
-    
+
     // If API probe succeeded, use that as primary signal
     if (probe.managedBy === 'api' && probe.ok) {
       // Still get systemctl info for display if available
@@ -2512,8 +2513,8 @@ app.get('/api/gateway/:profile', requireAuth, async (req, res) => {
           shell(`systemctl ${SYSTEMD_USER_FLAG} status ${svcs.primary} 2>/dev/null | head -10`),
         ]);
         systemdInfo = { enabled: isEnabled.trim() === 'enabled', status: status.trim() };
-      } catch {}
-      
+      } catch { }
+
       return res.json({
         ok: true,
         profile,
@@ -2525,7 +2526,7 @@ app.get('/api/gateway/:profile', requireAuth, async (req, res) => {
         systemd: systemdInfo,
       });
     }
-    
+
     // Fallback to systemctl
     const svc = svcs.primary;
     const [isActive, isEnabled, status] = await Promise.all([
@@ -2706,7 +2707,7 @@ app.get('/api/gateway/:profile/health', requireAuth, async (req, res) => {
         gatewayRunning = healthRes.ok && (data.status === 'ok' || healthRes.status === 200);
         managedBy = 'api';
         checks.service_status = gatewayRunning ? 'api-healthy' : 'api-unhealthy';
-      } catch {}
+      } catch { }
     }
     if (!gatewayRunning) {
       // Fallback: systemctl
@@ -2716,7 +2717,7 @@ app.get('/api/gateway/:profile/health', requireAuth, async (req, res) => {
         gatewayRunning = status === 'active';
         if (gatewayRunning) managedBy = 'systemd';
         checks.service_status = status;
-      } catch {}
+      } catch { }
     }
     if (!gatewayRunning) {
       // Fallback: check if something is listening on the port
@@ -2785,7 +2786,7 @@ app.get('/api/logs', requireAuth, requirePerm('logs.view'), async (req, res) => 
       profileDirs = fs.readdirSync(path.join(os.homedir(), '.hermes', 'profiles')).filter(d => {
         try { return fs.statSync(path.join(os.homedir(), '.hermes', 'profiles', d)).isDirectory(); } catch { return false; }
       });
-    } catch {}
+    } catch { }
 
     const profiles = profile === 'all'
       ? ['default', ...profileDirs]
@@ -2941,23 +2942,23 @@ app.post('/api/file', requireCsrf, (req, res) => {
 app.get('/api/files/list', requireAuth, (req, res) => {
   const dirPath = String(req.query.path || '').replace(/^\/+/, '').replace(/\.\./g, '');
   const baseDir = path.join(os.homedir(), '.hermes');
-  
+
   // Security: ensure we stay within .hermes
   const resolved = path.resolve(baseDir, dirPath);
   if (!resolved.startsWith(baseDir)) {
     return res.status(403).json({ error: 'path outside allowed roots' });
   }
-  
+
   try {
     if (!fs.existsSync(resolved)) {
       return res.status(404).json({ error: 'directory not found' });
     }
-    
+
     const stat = fs.statSync(resolved);
     if (!stat.isDirectory()) {
       return res.status(400).json({ error: 'not a directory' });
     }
-    
+
     const items = fs.readdirSync(resolved).map(name => {
       try {
         const itemPath = path.join(resolved, name);
@@ -2973,14 +2974,14 @@ app.get('/api/files/list', requireAuth, (req, res) => {
         return { name, type: 'unknown', path: path.relative(baseDir, path.join(resolved, name)) };
       }
     });
-    
+
     // Sort: directories first, then files
     items.sort((a, b) => {
       if (a.type === 'directory' && b.type !== 'directory') return -1;
       if (a.type !== 'directory' && b.type === 'directory') return 1;
       return a.name.localeCompare(b.name);
     });
-    
+
     res.json({
       ok: true,
       path: path.relative(baseDir, resolved),
@@ -3288,7 +3289,7 @@ app.get('/api/hci/check-update', requireRole('admin'), async (req, res) => {
     }
     // Get package.json version
     let pkgVersion = '';
-    try { pkgVersion = JSON.parse(fs.readFileSync(path.join(HCI_DIR, 'package.json'), 'utf8')).version; } catch {}
+    try { pkgVersion = JSON.parse(fs.readFileSync(path.join(HCI_DIR, 'package.json'), 'utf8')).version; } catch { }
 
     res.json({
       ok: true,
@@ -3575,7 +3576,7 @@ app.put('/api/config/:profile', requireAuth, requireRole('admin'), requireCsrf, 
     // Restart gateway service + refresh ports
     const svcFile = `/etc/systemd/system/hermes-gateway-${profile}.service`;
     if (fs.existsSync(svcFile)) {
-      try { await shell(`systemctl daemon-reload && systemctl restart hermes-gateway-${profile} 2>&1`, '15s'); } catch {}
+      try { await shell(`systemctl daemon-reload && systemctl restart hermes-gateway-${profile} 2>&1`, '15s'); } catch { }
     } else {
       console.log(`[ConfigSave] No gateway service for ${profile}, skipping restart`);
     }
@@ -3610,37 +3611,37 @@ app.put('/api/config/:profile', requireAuth, requireRole('admin'), requireCsrf, 
 // Key metadata: category, description, provider URL, advanced flag
 const KEY_METADATA = {
   // LLM Providers
-  OPENROUTER_API_KEY:      { cat: 'LLM Providers',    desc: 'OpenRouter API key',           url: 'https://openrouter.ai/keys',       adv: false },
-  OPENAI_API_KEY:          { cat: 'LLM Providers',    desc: 'OpenAI API key',               url: 'https://platform.openai.com/api-keys', adv: false },
-  ANTHROPIC_API_KEY:       { cat: 'LLM Providers',    desc: 'Anthropic API key',            url: 'https://console.anthropic.com/settings/keys', adv: false },
-  DEEPSEEK_API_KEY:        { cat: 'LLM Providers',    desc: 'DeepSeek API key',              url: 'https://platform.deepseek.com/api-keys', adv: false },
-  GEMINI_API_KEY:          { cat: 'LLM Providers',    desc: 'Google Gemini API key',         url: 'https://aistudio.google.com/app/apikey', adv: false },
-  GROQ_API_KEY:            { cat: 'LLM Providers',    desc: 'Groq API key',                  url: 'https://console.groq.com/keys',     adv: false },
-  MISTRAL_API_KEY:         { cat: 'LLM Providers',    desc: 'Mistral API key',               url: 'https://console.mistral.ai/api/',    adv: false },
-  TOGETHER_API_KEY:        { cat: 'LLM Providers',    desc: 'Together AI API key',           url: 'https://api.together.xyz/settings/api-keys', adv: false },
-  OPENAI_BASE_URL:         { cat: 'LLM Providers',    desc: 'OpenAI-compatible base URL',    url: '',  adv: false },
-  ANTHROPIC_BASE_URL:      { cat: 'LLM Providers',    desc: 'Anthropic base URL',            url: '',  adv: true },
-  DEEPSEEK_BASE_URL:       { cat: 'LLM Providers',    desc: 'DeepSeek base URL',             url: '',  adv: true },
-  LLM_MODEL:               { cat: 'LLM Providers',    desc: 'Default LLM model',             url: '',  adv: false },
-  LLM_PROVIDER:            { cat: 'LLM Providers',    desc: 'Default LLM provider',          url: '',  adv: false },
+  OPENROUTER_API_KEY: { cat: 'LLM Providers', desc: 'OpenRouter API key', url: 'https://openrouter.ai/keys', adv: false },
+  OPENAI_API_KEY: { cat: 'LLM Providers', desc: 'OpenAI API key', url: 'https://platform.openai.com/api-keys', adv: false },
+  ANTHROPIC_API_KEY: { cat: 'LLM Providers', desc: 'Anthropic API key', url: 'https://console.anthropic.com/settings/keys', adv: false },
+  DEEPSEEK_API_KEY: { cat: 'LLM Providers', desc: 'DeepSeek API key', url: 'https://platform.deepseek.com/api-keys', adv: false },
+  GEMINI_API_KEY: { cat: 'LLM Providers', desc: 'Google Gemini API key', url: 'https://aistudio.google.com/app/apikey', adv: false },
+  GROQ_API_KEY: { cat: 'LLM Providers', desc: 'Groq API key', url: 'https://console.groq.com/keys', adv: false },
+  MISTRAL_API_KEY: { cat: 'LLM Providers', desc: 'Mistral API key', url: 'https://console.mistral.ai/api/', adv: false },
+  TOGETHER_API_KEY: { cat: 'LLM Providers', desc: 'Together AI API key', url: 'https://api.together.xyz/settings/api-keys', adv: false },
+  OPENAI_BASE_URL: { cat: 'LLM Providers', desc: 'OpenAI-compatible base URL', url: '', adv: false },
+  ANTHROPIC_BASE_URL: { cat: 'LLM Providers', desc: 'Anthropic base URL', url: '', adv: true },
+  DEEPSEEK_BASE_URL: { cat: 'LLM Providers', desc: 'DeepSeek base URL', url: '', adv: true },
+  LLM_MODEL: { cat: 'LLM Providers', desc: 'Default LLM model', url: '', adv: false },
+  LLM_PROVIDER: { cat: 'LLM Providers', desc: 'Default LLM provider', url: '', adv: false },
   // Tool APIs
-  BROWSERBASE_API_KEY:     { cat: 'Tool APIs',        desc: 'Browserbase API key (web scraping)', url: 'https://browserbase.com',  adv: false },
-  BROWSERBASE_API_SECRET:  { cat: 'Tool APIs',        desc: 'Browserbase API secret',         url: 'https://browserbase.com',  adv: true },
-  FIRECRAWL_API_KEY:       { cat: 'Tool APIs',        desc: 'Firecrawl API key (web scraping)', url: 'https://firecrawl.dev', adv: false },
-  TAVILY_API_KEY:          { cat: 'Tool APIs',        desc: 'Tavily API key (web search)',   url: 'https://app.tavily.com',    adv: false },
-  ELEVENLABS_API_KEY:      { cat: 'Tool APIs',        desc: 'ElevenLabs API key (TTS)',     url: 'https://elevenlabs.io/api',  adv: false },
-  HUGGINGFACE_API_KEY:     { cat: 'Tool APIs',        desc: 'HuggingFace API key',          url: 'https://huggingface.co/settings/inference', adv: false },
+  BROWSERBASE_API_KEY: { cat: 'Tool APIs', desc: 'Browserbase API key (web scraping)', url: 'https://browserbase.com', adv: false },
+  BROWSERBASE_API_SECRET: { cat: 'Tool APIs', desc: 'Browserbase API secret', url: 'https://browserbase.com', adv: true },
+  FIRECRAWL_API_KEY: { cat: 'Tool APIs', desc: 'Firecrawl API key (web scraping)', url: 'https://firecrawl.dev', adv: false },
+  TAVILY_API_KEY: { cat: 'Tool APIs', desc: 'Tavily API key (web search)', url: 'https://app.tavily.com', adv: false },
+  ELEVENLABS_API_KEY: { cat: 'Tool APIs', desc: 'ElevenLabs API key (TTS)', url: 'https://elevenlabs.io/api', adv: false },
+  HUGGINGFACE_API_KEY: { cat: 'Tool APIs', desc: 'HuggingFace API key', url: 'https://huggingface.co/settings/inference', adv: false },
   // Messaging Platforms
-  TELEGRAM_BOT_TOKEN:      { cat: 'Messaging Platforms', desc: 'Telegram bot token',         url: 'https://t.me/BotFather',    adv: false },
-  DISCORD_BOT_TOKEN:       { cat: 'Messaging Platforms', desc: 'Discord bot token',           url: 'https://discord.com/developers/applications', adv: false },
-  SLACK_BOT_TOKEN:         { cat: 'Messaging Platforms', desc: 'Slack bot token (xoxb)',      url: 'https://api.slack.com/apps', adv: false },
-  WHATSAPP_SESSION_PATH:   { cat: 'Messaging Platforms', desc: 'WhatsApp session file path', url: '',  adv: false },
+  TELEGRAM_BOT_TOKEN: { cat: 'Messaging Platforms', desc: 'Telegram bot token', url: 'https://t.me/BotFather', adv: false },
+  DISCORD_BOT_TOKEN: { cat: 'Messaging Platforms', desc: 'Discord bot token', url: 'https://discord.com/developers/applications', adv: false },
+  SLACK_BOT_TOKEN: { cat: 'Messaging Platforms', desc: 'Slack bot token (xoxb)', url: 'https://api.slack.com/apps', adv: false },
+  WHATSAPP_SESSION_PATH: { cat: 'Messaging Platforms', desc: 'WhatsApp session file path', url: '', adv: false },
   // Agent Settings
-  HERMES_CONTROL_PASSWORD:  { cat: 'Agent Settings',   desc: 'HCI control password',         url: '',  adv: false },
-  HERMES_CONTROL_SECRET:   { cat: 'Agent Settings',   desc: 'HCI control secret',           url: '',  adv: true },
-  API_SERVER_ENABLED:      { cat: 'Agent Settings',   desc: 'Enable API server',             url: '',  adv: false },
-  API_SERVER_PORT:         { cat: 'Agent Settings',   desc: 'API server port',               url: '',  adv: true },
-  WEBHOOK_SECRET:          { cat: 'Agent Settings',   desc: 'Webhook verification secret',   url: '',  adv: true },
+  HERMES_CONTROL_PASSWORD: { cat: 'Agent Settings', desc: 'HCI control password', url: '', adv: false },
+  HERMES_CONTROL_SECRET: { cat: 'Agent Settings', desc: 'HCI control secret', url: '', adv: true },
+  API_SERVER_ENABLED: { cat: 'Agent Settings', desc: 'Enable API server', url: '', adv: false },
+  API_SERVER_PORT: { cat: 'Agent Settings', desc: 'API server port', url: '', adv: true },
+  WEBHOOK_SECRET: { cat: 'Agent Settings', desc: 'Webhook verification secret', url: '', adv: true },
   // MCP Keys (match by prefix)
   _MCP_KEYS_PREFIX: ['MCP_'],
 };
@@ -4105,7 +4106,7 @@ app.post('/api/backup/import', requireRole('admin'), requireCsrf, (req, res) => 
       }
     });
     proc.on('close', (code) => {
-      try { fs.unlinkSync(zipPath); } catch {}
+      try { fs.unlinkSync(zipPath); } catch { }
       audit(req.hciUser?.username || 'unknown', req.hciUser?.role || 'unknown', 'BACKUP_IMPORT', req.file.originalname);
       res.write(`data: ${JSON.stringify({ type: 'done', output: fullOutput.trim() })}\n\n`);
       res.end();
@@ -4161,7 +4162,7 @@ app.post('/api/update', requireRole('admin'), requireCsrf, (req, res) => {
       if (fs.existsSync(promptPath)) {
         fs.writeFileSync(responsePath, 'Y');
       }
-    } catch {}
+    } catch { }
   }, 500);
 
   const proc = spawn('script', ['-qfc', 'hermes update --gateway', '/dev/null'], {
@@ -4184,8 +4185,8 @@ app.post('/api/update', requireRole('admin'), requireCsrf, (req, res) => {
   proc.on('close', (code) => {
     clearInterval(answerInterval);
     // Clean up IPC files
-    try { fs.unlinkSync(promptPath); } catch {}
-    try { fs.unlinkSync(responsePath); } catch {}
+    try { fs.unlinkSync(promptPath); } catch { }
+    try { fs.unlinkSync(responsePath); } catch { }
     res.write(`data: ${JSON.stringify({ type: 'done', output: fullOutput.trim() })}\n\n`);
     res.end();
   });
@@ -4232,7 +4233,7 @@ app.get('/api/sessions/:id/export', requireAuth, async (req, res) => {
     const tmpFile = `/tmp/session-${crypto.randomUUID()}.jsonl`;
     const output = await execHermes(['sessions', 'export', tmpFile, '--session-id', sessionId]);
     const data = await fs.promises.readFile(tmpFile, 'utf8').catch(() => output);
-    await fs.promises.unlink(tmpFile).catch(() => {});
+    await fs.promises.unlink(tmpFile).catch(() => { });
     res.json({ ok: true, data: data || output });
   } catch (e) {
     res.json({ ok: false, error: e.message });
@@ -4530,7 +4531,7 @@ function parseInsights(raw) {
         return { name: parts[0]?.trim() || '', sessions: parts[1]?.trim() || '', messages: parts[2]?.trim() || '', tokens: parts[3]?.trim() || '' };
       });
     }
-  } catch {}
+  } catch { }
   return data;
 }
 
@@ -4714,7 +4715,7 @@ app.post('/api/profiles/create', requireRole('admin'), requireCsrf, async (req, 
     // Install gateway service (after config is finalized with api_server)
     try {
       await shell(`bash /root/projects/hci-staging/scripts/setup-gateway-service.sh --profile ${safeName} --user root --force 2>&1`, '30s');
-    } catch {}
+    } catch { }
     // Refresh port discovery
     gatewayPorts = discoverGatewayPorts();
 
@@ -4739,7 +4740,7 @@ app.delete('/api/profiles/:name', requireRole('admin'), requireCsrf, async (req,
     try {
       await shell(`systemctl stop hermes-gateway-${name} 2>/dev/null; systemctl disable hermes-gateway-${name} 2>/dev/null; rm -f /etc/systemd/system/hermes-gateway-${name}.service; systemctl daemon-reload 2>&1`, '10s');
       console.log(`[ProfileDelete] Cleaned up gateway service for ${name}`);
-    } catch {}
+    } catch { }
     // Refresh port discovery
     gatewayPorts = discoverGatewayPorts();
     // Invalidate cache
@@ -4870,6 +4871,355 @@ app.put('/api/hermes-cron/:profile/:jobId', requireCsrf, async (req, res) => {
     res.json({ ok: false, error: e.message });
   }
 });
+
+// ── Kanban Board API ─────────────────────────────────────────────────────
+// Each board has its own SQLite DB. The default board is at ~/.hermes/kanban.db;
+// named boards are at ~/.hermes/kanban/boards/<slug>/kanban.db.
+// We use the hermes CLI (execHermes) for all operations, passing --board <slug>
+// so the same backend works regardless of global CLI state.
+
+const KANBAN_HOME = path.join(os.homedir(), '.hermes', 'kanban');
+const DEFAULT_KANBAN_DB = path.join(os.homedir(), '.hermes', 'kanban.db');
+
+function kanbanDbPath(boardSlug) {
+  if (!boardSlug || boardSlug === 'default') return DEFAULT_KANBAN_DB;
+  return path.join(KANBAN_HOME, 'boards', boardSlug, 'kanban.db');
+}
+
+function openKanbanDb(boardSlug, readonly = true) {
+  const dbPath = kanbanDbPath(boardSlug || 'default');
+  if (!fs.existsSync(dbPath)) return null;
+  return new Database(dbPath, { readonly });
+}
+
+// Priority label mapping (priority is stored as integer in SQLite)
+const PRIORITY_LABELS = { 0: 'none', 1: 'low', 2: 'medium', 3: 'high', 4: 'critical' };
+
+function priorityLabel(pri) {
+  if (pri === null || pri === undefined || pri === 0) return 'none';
+  return PRIORITY_LABELS[pri] || String(pri);
+}
+
+// ── GET /api/kanban/board — tasks grouped by status, plus board list
+// Reads directly from SQLite to avoid the CLI's recompute_ready() which
+// auto-promotes todo→ready regardless of what the user set via PATCH.
+app.get('/api/kanban/board', async (req, res) => {
+  const board = req.query.board || 'default';
+  console.log(`[kanban] GET /board?board=${board}`);
+  try {
+    const db = openKanbanDb(board);
+    if (!db) {
+      return res.json({ ok: false, error: 'kanban database not found for board: ' + board });
+    }
+
+    // Run recompute_ready via CLI to keep DB consistent with dependency state,
+    // then read raw SQLite statuses (which won't be overridden by the CLI).
+    // The recompute is fire-and-forget — best-effort housekeeping.
+    execHermes(['kanban', '--board', board, 'list'], 10000).catch(() => { });
+
+    // Read tasks directly from SQLite — raw status, no CLI reinterpretation
+    const rows = db.prepare("SELECT * FROM tasks WHERE status != 'archived' ORDER BY priority DESC, created_at ASC").all();
+    const tasks = rows.map(r => ({
+      ...r,
+      priority_label: priorityLabel(r.priority),
+      skills: r.skills ? JSON.parse(r.skills) : [],
+    }));
+
+    // Fetch boards list (via CLI — board metadata is filesystem-based)
+    let boards = [];
+    try {
+      const boardsOutput = await execHermes(['kanban', 'boards', 'list', '--json'], 10000);
+      boards = JSON.parse(boardsOutput);
+    } catch { /* boards list is best-effort */ }
+
+    db.close();
+    console.log(`[kanban] Loaded ${tasks.length} tasks, ${boards.length} boards (direct SQLite)`);
+
+    // Map statuses to columns — must match the official Hermes kanban workflow
+    // Valid statuses: triage, todo, ready, running, blocked, done, archived
+    const statusColumns = [
+      { id: 'triage', label: 'Triage', color: 'border-t-gray-400' },
+      { id: 'todo', label: 'Todo', color: 'border-t-stone-400' },
+      { id: 'ready', label: 'Ready', color: 'border-t-blue-400' },
+      { id: 'running', label: 'Running', color: 'border-t-amber-400' },
+      { id: 'blocked', label: 'Blocked', color: 'border-t-red-400' },
+      { id: 'done', label: 'Done', color: 'border-t-green-500' },
+    ];
+
+    const columns = statusColumns.map(col => ({
+      id: col.id,
+      label: col.label,
+      tasks: [],
+    }));
+
+    const otherTasks = [];
+
+    for (const t of tasks) {
+      const col = columns.find(c => c.id === t.status);
+      if (col) {
+        col.tasks.push(t);
+      } else {
+        otherTasks.push(t);
+      }
+    }
+    if (otherTasks.length > 0) {
+      columns.push({ id: 'other', label: 'Other', tasks: otherTasks });
+    }
+
+    const activeBoard = boards ? boards.find(b => b.is_current) || null : null;
+
+    res.json({ ok: true, columns, boards, activeBoard });
+  } catch (e) {
+    console.error(`[kanban] GET /board error:`, e.message);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── GET /api/kanban/tasks/:id — task detail (uses `hermes kanban show --json`)
+app.get('/api/kanban/tasks/:id', async (req, res) => {
+  const board = req.query.board || 'default';
+  console.log(`[kanban] GET /tasks/${req.params.id}?board=${board}`);
+  try {
+    const output = await execHermes(['kanban', '--board', board, 'show', req.params.id, '--json'], 15000);
+    let data;
+    try { data = JSON.parse(output); } catch {
+      return res.json({ ok: false, error: 'Failed to parse task detail', raw: output });
+    }
+    res.json({
+      ok: true,
+      task: data.task,
+      parents: data.parents || [],
+      children: data.children || [],
+      comments: data.comments || [],
+      events: data.events || [],
+      runs: data.runs || [],
+      latest_summary: data.latest_summary || null,
+    });
+  } catch (e) {
+    console.error(`[kanban] GET /tasks/:id error:`, e.message);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /api/kanban/tasks — create a new task
+app.post('/api/kanban/tasks', async (req, res) => {
+  const { title, body, priority, assignee, board } = req.body || {};
+  console.log(`[kanban] POST /tasks board=${board} title="${title}"`);
+  if (!title || typeof title !== 'string') {
+    return res.status(400).json({ ok: false, error: 'title required' });
+  }
+
+  const args = ['kanban', '--board', board || 'default', 'create', title, '--json'];
+  if (body) args.push('--body', String(body));
+  if (priority !== undefined && priority !== null && priority !== 'none') {
+    // Map priority label to integer if needed, or pass through
+    const priMap = { low: 1, medium: 2, high: 3, critical: 4 };
+    const pVal = priMap[String(priority)] ?? Number(priority);
+    if (!isNaN(pVal)) args.push('--priority', String(pVal));
+  }
+  if (assignee) args.push('--assignee', String(assignee));
+
+  try {
+    const output = await execHermes(args, 15000);
+    console.log(`[kanban] Create task output:`, output.substring(0, 200));
+    try {
+      const parsed = JSON.parse(output);
+      return res.json({ ok: true, task: parsed });
+    } catch {
+      // CLI returned non-JSON (likely error)
+      return res.json({ ok: false, error: stripAnsi(output).trim() || 'Unknown error creating task' });
+    }
+  } catch (e) {
+    console.error(`[kanban] POST /tasks error:`, e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── PATCH /api/kanban/tasks/:id — update task fields (direct SQLite for fields CLI doesn't expose)
+app.patch('/api/kanban/tasks/:id', (req, res) => {
+  const board = req.query.board || 'default';
+  console.log(`[kanban] PATCH /tasks/${req.params.id}?board=${board} body=`, req.body);
+  const db = openKanbanDb(board, false);
+  if (!db) {
+    console.error(`[kanban] DB not found for board: ${board}`);
+    return res.status(404).json({ ok: false, error: 'kanban database not found for board: ' + board });
+  }
+  try {
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    if (!task) {
+      console.error(`[kanban] Task not found: ${req.params.id}`);
+      db.close();
+      return res.status(404).json({ ok: false, error: 'task not found' });
+    }
+    console.log(`[kanban] Task found, current status=${task.status}`);
+
+    const { title, body, status, priority, assignee } = req.body || {};
+    const updates = [];
+    const values = [];
+    const now = Math.floor(Date.now() / 1000);
+
+    // Build SET clause with positional ? placeholders (compatible with both Bun and Node SQLite)
+    if (title !== undefined) { updates.push('title = ?'); values.push(String(title)); }
+    if (body !== undefined) { updates.push('body = ?'); values.push(body === null ? null : String(body)); }
+    if (status !== undefined) {
+      updates.push('status = ?');
+      values.push(String(status));
+      // Set timestamps based on status transition (Hermes state machine)
+      if (status === 'running' && !task.started_at) {
+        updates.push('started_at = ?');
+        values.push(now);
+      }
+      if (status === 'done' && !task.completed_at) {
+        updates.push('completed_at = ?');
+        values.push(now);
+      }
+    }
+    if (priority !== undefined) {
+      const priMap = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+      const pVal = priMap[String(priority)] ?? Number(priority);
+      updates.push('priority = ?');
+      values.push(isNaN(pVal) ? 0 : pVal);
+    }
+    if (assignee !== undefined) {
+      updates.push('assignee = ?');
+      values.push(assignee === null || assignee === '' ? null : String(assignee));
+    }
+
+    if (updates.length === 0) {
+      console.log(`[kanban] No fields to update`);
+      db.close();
+      return res.json({ ok: true, task });
+    }
+
+    // WHERE clause uses positional ? — id is the last value
+    values.push(req.params.id);
+    const sql = `UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`;
+    console.log(`[kanban] SQL: ${sql} values=`, values);
+    db.prepare(sql).run(...values);
+
+    // Log status change event
+    if (status !== undefined && status !== task.status) {
+      const payload = JSON.stringify({ status });
+      db.prepare('INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, ?, ?, ?)').run(
+        req.params.id, 'status', payload, now
+      );
+    }
+
+    const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    console.log(`[kanban] Updated status=${updated.status}`);
+    db.close();
+    res.json({ ok: true, task: updated, priority_label: priorityLabel(updated.priority) });
+  } catch (e) {
+    console.error(`[kanban] PATCH error:`, e.message);
+    try { db.close(); } catch { }
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /api/kanban/tasks/:id/comments — add a comment via CLI
+app.post('/api/kanban/tasks/:id/comments', async (req, res) => {
+  const board = req.query.board || 'default';
+  const { body } = req.body || {};
+  if (!body) return res.status(400).json({ ok: false, error: 'comment body required' });
+  console.log(`[kanban] POST /tasks/${req.params.id}/comments?board=${board}`);
+
+  try {
+    const output = await execHermes(['kanban', '--board', board, 'comment', req.params.id, String(body)], 15000);
+    if (output.includes('Comment added')) {
+      return res.json({ ok: true });
+    }
+    res.json({ ok: false, error: stripAnsi(output).trim() || 'Failed to add comment' });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── DELETE /api/kanban/tasks/:id — archive via CLI
+app.delete('/api/kanban/tasks/:id', async (req, res) => {
+  const board = req.query.board || 'default';
+  console.log(`[kanban] DELETE /tasks/${req.params.id}?board=${board}`);
+  try {
+    const output = await execHermes(['kanban', '--board', board, 'archive', req.params.id], 15000);
+    if (output.includes('Archived')) {
+      return res.json({ ok: true });
+    }
+    res.json({ ok: false, error: stripAnsi(output).trim() || 'Failed to archive task' });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── GET /api/kanban/boards — list all boards via CLI
+app.get('/api/kanban/boards', async (req, res) => {
+  console.log(`[kanban] GET /boards`);
+  try {
+    const output = await execHermes(['kanban', 'boards', 'list', '--json'], 10000);
+    try {
+      const boards = JSON.parse(output);
+      return res.json({ ok: true, boards });
+    } catch {
+      return res.json({ ok: false, error: 'Failed to parse boards list', raw: output });
+    }
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /api/kanban/boards — create a new board (no --json support, parse text)
+app.post('/api/kanban/boards', async (req, res) => {
+  const { slug } = req.body || {};
+  if (!slug) return res.status(400).json({ ok: false, error: 'slug required' });
+  console.log(`[kanban] POST /boards slug=${slug}`);
+
+  try {
+    const output = await execHermes(['kanban', 'boards', 'create', slug], 10000);
+    const cleaned = stripAnsi(output).trim();
+    console.log(`[kanban] Board create output:`, cleaned);
+    if (cleaned.includes('created') || cleaned.includes('already exists')) {
+      return res.json({ ok: true, slug, output: cleaned });
+    }
+    res.json({ ok: false, error: cleaned || 'Failed to create board' });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /api/kanban/boards/:slug/switch — switch active board via CLI
+app.post('/api/kanban/boards/:slug/switch', async (req, res) => {
+  console.log(`[kanban] POST /boards/${req.params.slug}/switch`);
+  try {
+    const output = await execHermes(['kanban', 'boards', 'switch', req.params.slug], 10000);
+    if (output.includes('Active board is now')) {
+      return res.json({ ok: true, activeBoard: req.params.slug });
+    }
+    res.json({ ok: false, error: stripAnsi(output).trim() || 'Failed to switch board' });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── GET /api/kanban/stats — board statistics via CLI
+app.get('/api/kanban/stats', async (req, res) => {
+  const board = req.query.board || 'default';
+  console.log(`[kanban] GET /stats?board=${board}`);
+  try {
+    const output = await execHermes(['kanban', '--board', board, 'stats', '--json'], 10000);
+    try {
+      const parsed = JSON.parse(output);
+      return res.json({ ok: true, stats: parsed });
+    } catch {
+      return res.json({ ok: false, error: 'Failed to parse stats', raw: output });
+    }
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function safeJsonParse(str, fallback) {
+  if (!str) return fallback;
+  try { return JSON.parse(str); } catch { return fallback; }
+}
 
 const server = (() => {
   const sslCert = cfg.ssl.certFile;
@@ -5057,7 +5407,7 @@ async function handleWsChatStart(socket, msg) {
             if (wsEvent) {
               socket.send(JSON.stringify({ type: 'chat.event', event: wsEvent }));
             }
-          } catch {}
+          } catch { }
         }
       }
     } catch (pipeErr) {
@@ -5267,7 +5617,7 @@ wss.on('connection', async (socket, req) => {
           socket.send(JSON.stringify({ type: 'chat.error', error: err.message }));
         }
       }
-    } catch {}
+    } catch { }
   });
   socket.on('close', () => {
     if (socket.tuiBridge) {
@@ -5275,7 +5625,7 @@ wss.on('connection', async (socket, req) => {
       socket.tuiBridge = null;
     }
     if (socket.activeChatReader) {
-      socket.activeChatReader.cancel().catch(() => {});
+      socket.activeChatReader.cancel().catch(() => { });
       socket.activeChatReader = null;
     }
   });
@@ -5287,7 +5637,7 @@ wss.on('connection', async (socket, req) => {
 log('system.started', 'Hermes Control Interface booted');
 
 // Warm up insights cache in background — so first WebSocket doesn't timeout
-getInsights().catch(() => {});
+getInsights().catch(() => { });
 
 // Lightweight system metrics broadcast every 5 seconds (no hermes commands)
 setInterval(() => {
@@ -5304,11 +5654,11 @@ function shutdown(signal) {
   killAllBridges();
   // Kill PTY process
   if (terminalSession.proc) {
-    try { terminalSession.proc.kill(); } catch {}
+    try { terminalSession.proc.kill(); } catch { }
   }
   // Close WebSocket connections
   for (const client of wss.clients) {
-    try { client.close(1001, 'server shutting down'); } catch {}
+    try { client.close(1001, 'server shutting down'); } catch { }
   }
   // Close server
   server.close(() => {
