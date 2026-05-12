@@ -2,12 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/app/lib/api-client';
-import { useTheme } from '@/app/hooks/useTheme';
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, Title, Tooltip, Legend, Filler,
-} from 'chart.js';
-import { Bar, Line } from 'react-chartjs-2';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,33 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
-
-// ─── Chart theme colours (matching globals.css chart variables) ──────────────
-
-const CHART_COLORS_LIGHT = [
-  'oklch(0.841 0.238 128.85)',    // primary
-  'oklch(0.648 0.2 131.684)',      // sidebar-primary
-  'oklch(0.87 0 0)',               // chart-1
-  'oklch(0.556 0 0)',              // chart-2
-  'oklch(0.439 0 0)',              // chart-3
-  'oklch(0.841 0.238 128.85 / 0.65)',
-  'oklch(0.648 0.2 131.684 / 0.65)',
-  'oklch(0.87 0 0 / 0.65)',
-];
-
-const CHART_COLORS_DARK = [
-  'oklch(0.768 0.233 130.85)',     // primary
-  'oklch(0.768 0.233 130.85 / 0.75)', // sidebar-primary
-  'oklch(0.87 0 0)',               // chart-1
-  'oklch(0.556 0 0)',              // chart-2
-  'oklch(0.439 0 0)',              // chart-3
-  'oklch(0.768 0.233 130.85 / 0.65)',
-  'oklch(0.768 0.233 130.85 / 0.75 / 0.65)',
-  'oklch(0.87 0 0 / 0.65)',
-];
-
-const CHART_COLORS = CHART_COLORS_DARK; // default for initial render
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -83,7 +50,6 @@ interface BudgetStatus { over: boolean; percentage: number; }
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function UsagePage() {
-  const { theme } = useTheme();
   const [days, setDays] = useState('7');
   const [agent, setAgent] = useState('');
   const [budget, setBudget] = useState(() => {
@@ -162,97 +128,18 @@ export default function UsagePage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── Chart helpers ─────────────────────────────────────────────────────────
+  // ── Daily totals ──────────────────────────────────────────────────────────
 
-  const isDark = theme === 'dark';
-  const chartColors = isDark ? CHART_COLORS_DARK : CHART_COLORS_LIGHT;
-  const chartTextColor = isDark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)';
-  const chartGridColor = isDark ? 'oklch(1 0 0 / 0.08)' : 'oklch(0 0 0 / 0.08)';
-
-  function getTokenChartData() {
-    const hasDaily = !!(daily && daily.daily && daily.daily.length > 0);
-    let labels: string[], datasets: any[], stacked = true;
-    if (hasDaily) {
-      labels = daily!.daily.map(r => r.date);
-      datasets = [
-        { label: 'Input', data: daily!.daily.map(r => r.input_tokens || 0), backgroundColor: chartColors[0], borderRadius: 4 },
-        { label: 'Output', data: daily!.daily.map(r => r.output_tokens || 0), backgroundColor: chartColors[1], borderRadius: 4 },
-        { label: 'Cache', data: daily!.daily.map(r => r.cache_read_tokens || 0), backgroundColor: chartColors[3], borderRadius: 4 },
-      ];
-    } else if (overview?.models && overview.models.length > 0) {
-      const top = overview.models.slice(0, 8);
-      labels = top.map(m => m.name);
-      datasets = [{ label: 'Tokens', data: top.map(m => m.tokens || 0), backgroundColor: chartColors.slice(0, 8), borderRadius: 4 }];
-      stacked = false;
-    } else { labels = []; datasets = []; }
-    return {
-      labels, datasets,
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: hasDaily, labels: { color: chartTextColor, font: { size: 11 } } } },
-        scales: {
-          x: { stacked, ticks: { color: chartTextColor, maxRotation: 45, font: { size: 10 } }, grid: { color: chartGridColor } },
-          y: { stacked, ticks: { color: chartTextColor, callback: (v: any) => formatNumber(Number(v)), font: { size: 10 } }, grid: { color: chartGridColor } },
-        },
-      } as const,
-    };
-  }
-
-  function getCostChartData() {
-    if (!daily?.daily || daily.daily.length === 0) {
-      if (overview?.models && overview.models.length > 0) {
-        const top = overview.models.slice(0, 6);
-        return {
-          labels: top.map(m => m.name),
-          datasets: [{ label: 'Sessions', data: top.map(m => m.sessions || 0), backgroundColor: chartColors.slice(0, 6), borderRadius: 4 }],
-          options: {
-            responsive: true, maintainAspectRatio: false, indexAxis: 'y' as const,
-            plugins: { legend: { display: false } },
-            scales: { x: { ticks: { color: chartTextColor, font: { size: 10 } }, grid: { color: chartGridColor } }, y: { ticks: { color: chartTextColor, font: { size: 10 } }, grid: { color: chartGridColor } } },
-          },
-        };
-      }
-      return null;
-    }
-    const costData = daily.daily.map(r => r.cost || 0);
-    const baseLabels = daily.daily.map(r => r.date);
-    const totalCost = costData.reduce((s: number, v: number) => s + v, 0);
-    let weightedSum = 0, weightTotal = 0;
-    for (let i = 0; i < costData.length; i++) { const w = Math.pow(0.85, costData.length - 1 - i); weightedSum += costData[i] * w; weightTotal += w; }
-    const avgDailyCost = weightTotal > 0 ? weightedSum / weightTotal : 0;
-    const simpleAvg = costData.length > 0 ? totalCost / costData.length : 0;
-    const projAvg = costData.length >= 3 ? avgDailyCost : simpleAvg;
-    const today = new Date(); const year = today.getFullYear(); const month = today.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const endOfMonth = `${year}-${String(month + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
-    const extendedLabels = [...baseLabels];
-    const projectionData: (number | null)[] = new Array(baseLabels.length).fill(null);
-    let cursor = new Date(baseLabels[baseLabels.length - 1] + 'T00:00:00');
-    const endDate = new Date(endOfMonth + 'T00:00:00');
-    while (cursor < endDate) { cursor.setDate(cursor.getDate() + 1); extendedLabels.push(cursor.toISOString().slice(0, 10)); projectionData.push(null); }
-    const cumulativeActual: number[] = []; let cumSum = 0;
-    for (const c of costData) { cumSum += c; cumulativeActual.push(cumSum); }
-    const lastCumCost = cumulativeActual.length > 0 ? cumulativeActual[cumulativeActual.length - 1] : 0;
-    const projStart = baseLabels.length;
-    for (let i = 0; i < projectionData.length - projStart; i++) { projectionData[projStart + i] = lastCumCost + projAvg * (i + 1); }
-    const actualPadded = [...cumulativeActual, ...new Array(extendedLabels.length - cumulativeActual.length).fill(null)];
-    const datasets: any[] = [
-      { label: 'Cumulative Cost ($)', data: actualPadded, borderColor: chartColors[0], backgroundColor: isDark ? 'oklch(0.768 0.233 130.85 / 0.12)' : 'oklch(0.841 0.238 128.85 / 0.12)', fill: true, tension: 0.3, pointRadius: 3, spanGaps: false },
-      { label: 'Monthly Projection', data: projectionData, borderColor: isDark ? 'oklch(0.768 0.233 130.85 / 0.45)' : 'oklch(0.841 0.238 128.85 / 0.45)', borderDash: [6, 4], backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 0, spanGaps: false },
-    ];
-    if (budget > 0) datasets.push({ label: `Budget ($${budget})`, data: new Array(extendedLabels.length).fill(budget), borderColor: isDark ? 'oklch(0.704 0.191 22.216)' : 'oklch(0.577 0.245 27.325)', borderDash: [8, 4], backgroundColor: 'transparent', fill: false, pointRadius: 0, borderWidth: 2, spanGaps: true });
-    return {
-      labels: extendedLabels, datasets, monthlyPace: projAvg * 30,
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: true, labels: { color: chartTextColor, font: { size: 10 }, boxWidth: 12, padding: 10 } }, tooltip: { callbacks: { label: (ctx: any) => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}` } } },
-        scales: { x: { ticks: { color: chartTextColor, maxRotation: 45, font: { size: 10 } }, grid: { color: chartGridColor } }, y: { ticks: { color: chartTextColor, callback: (v: any) => '$' + Number(v).toFixed(2), font: { size: 10 } }, grid: { color: chartGridColor }, beginAtZero: true } },
-      } as const,
-    };
-  }
-
-  const tokenChart = getTokenChartData();
-  const costChart = getCostChartData();
+  const dailyTotals = daily?.daily?.reduce(
+    (acc, row) => ({
+      inputTokens: acc.inputTokens + (row.input_tokens || 0),
+      outputTokens: acc.outputTokens + (row.output_tokens || 0),
+      cacheReadTokens: acc.cacheReadTokens + (row.cache_read_tokens || 0),
+      cost: acc.cost + (row.cost || 0),
+    }),
+    { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cost: 0 },
+  );
+  const dayCount = daily?.daily?.length ?? 0;
 
   // ─── Stats config ──────────────────────────────────────────────────────────
 
@@ -359,49 +246,49 @@ export default function UsagePage() {
         </CardContent>
       </Card>
 
-      {/* Charts: 2-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Token trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Token Trend</CardTitle>
-            <CardDescription>Input · Output · Cache read tokens per day</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[240px]">
-              {tokenChart && tokenChart.labels.length > 0 ? (
-                <Bar data={{ labels: tokenChart.labels, datasets: tokenChart.datasets }} options={tokenChart.options} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>
-              )}
+      {/* Daily Data Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Daily Usage</CardTitle>
+          <CardDescription>Token and cost summary for the selected period</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && !daily ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Spinner className="size-3" /> Loading...
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Cost chart + model doughnut */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Daily Cost
-              {costChart && 'monthlyPace' in costChart && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  · ~${(costChart as any).monthlyPace.toFixed(2)}/mo pace
-                </span>
-              )}
-            </CardTitle>
-            <CardDescription>Cumulative cost with end-of-month projection</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[240px]">
-              {costChart ? (
-                <Line data={{ labels: costChart.labels, datasets: costChart.datasets }} options={costChart.options} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data available</div>
-              )}
+          ) : daily?.daily && daily.daily.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="flex flex-col items-center text-center gap-1">
+                <span className="text-lg font-bold text-primary tabular-nums">{formatNumber(dailyTotals?.inputTokens || 0)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Input Tokens</span>
+              </div>
+              <div className="flex flex-col items-center text-center gap-1">
+                <span className="text-lg font-bold text-primary tabular-nums">{formatNumber(dailyTotals?.outputTokens || 0)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Output Tokens</span>
+              </div>
+              <div className="flex flex-col items-center text-center gap-1">
+                <span className="text-lg font-bold text-primary tabular-nums">{formatNumber(dailyTotals?.cacheReadTokens || 0)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Cache Tokens</span>
+              </div>
+              <div className="flex flex-col items-center text-center gap-1">
+                <span className="text-lg font-bold text-primary tabular-nums">${dailyTotals?.cost.toFixed(2) || '0.00'}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Cost</span>
+              </div>
+              <div className="flex flex-col items-center text-center gap-1">
+                <span className="text-lg font-bold text-primary tabular-nums">${(dailyTotals && dayCount > 0 ? dailyTotals.cost / dayCount : 0).toFixed(2)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Avg Daily Cost</span>
+              </div>
+              <div className="flex flex-col items-center text-center gap-1">
+                <span className="text-lg font-bold text-primary tabular-nums">{dayCount}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Days</span>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <div className="text-muted-foreground text-sm py-2">No daily data available</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Models + Platforms + Top Tools */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

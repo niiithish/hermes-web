@@ -621,11 +621,41 @@ export default function ChatPage() {
               </EmptyDescription>
             </Empty>
           )}
-          {messages.map((msg, idx) => {
-            const isStreaming = streaming && idx === messages.length - 1;
+          {/* Pre-process: attach tool messages to the following non-tool message */}
+          {(() => {
+            const processedMessages: Array<{
+              msg: Message;
+              toolCalls: Array<{ msg: Message; originalIdx: number }>;
+              originalIdx: number;
+            }> = [];
+
+            let pendingTools: Array<{ msg: Message; originalIdx: number }> = [];
+
+            messages.forEach((m, i) => {
+              if (m.role === "tool") {
+                pendingTools.push({ msg: m, originalIdx: i });
+              } else {
+                processedMessages.push({
+                  msg: m,
+                  toolCalls: [...pendingTools],
+                  originalIdx: i,
+                });
+                pendingTools = [];
+              }
+            });
+
+            // Attach any trailing tool messages to the last processed message
+            if (pendingTools.length > 0 && processedMessages.length > 0) {
+              const last = processedMessages[processedMessages.length - 1];
+              last.toolCalls.push(...pendingTools);
+            }
+
+            return processedMessages;
+          })().map(({ msg, toolCalls, originalIdx }) => {
+            const isStreaming = streaming && originalIdx === messages.length - 1;
             return (
               <div
-                key={idx}
+                key={originalIdx}
                 className={cn(
                   "flex flex-col max-w-[85%]",
                   msg.role === "user"
@@ -640,91 +670,84 @@ export default function ChatPage() {
                       "leading-relaxed break-words",
                       msg.role === "user" &&
                         "px-3.5 py-2 rounded-lg border text-sm bg-primary/10 border-primary",
-                      msg.role === "tool" &&
-                        "px-2 py-1 text-[11px] text-muted-foreground/70 font-mono bg-transparent border-0",
                       msg.role !== "user" &&
-                        msg.role !== "tool" &&
                         "px-3.5 py-2 rounded-lg border text-sm bg-card border-border",
                     )}
                   >
-                    {/* Tool call — collapsed by default */}
-                    {msg.role === "tool" && msg.content && (
-                      <div>
-                        <button
-                          onClick={() =>
-                            setExpandedTools((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(idx)) next.delete(idx);
-                              else next.add(idx);
-                              return next;
-                            })
-                          }
-                          className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer select-none flex items-center gap-0.5 font-mono"
-                        >
-                          {expandedTools.has(idx) ? (
-                            <RiArrowDownSLine className="size-3.5" />
-                          ) : (
-                            <RiArrowRightSLine className="size-3.5" />
-                          )}
-                          tool call
-                        </button>
-                        {expandedTools.has(idx) && (
-                          <div className="mt-1 text-[11px] text-muted-foreground/70 font-mono whitespace-pre-wrap break-words border-l-2 border-muted-foreground/10 pl-2">
-                            {msg.content}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {msg.role !== "tool" && (
-                      <>
-                        {/* Content — strip partial <think> blocks during streaming so
-                            literal thinking tags don't flash before they're extracted. */}
-                        {msg.content && (() => {
-                          // During streaming, strip incomplete <think> blocks from display
-                          // so the raw XML doesn't flicker before extractThinking runs at done.
-                          const display = isStreaming
-                            ? msg.content
-                                .replace(/<think>[\s\S]*?<\/think>/g, "")
-                                .replace(/<think>[\s\S]*$/, "")
-                                .trim()
-                            : msg.content;
-                          if (!display) return null;
-                          return (
-                            <div
-                              dangerouslySetInnerHTML={{
-                                __html: renderContent(display),
-                              }}
-                            />
-                          );
-                        })()}
-                      </>
-                    )}
+                    {/* Content — strip partial <think> blocks during streaming so
+                        literal thinking tags don't flash before they're extracted. */}
+                    {msg.content && (() => {
+                      // During streaming, strip incomplete <think> blocks from display
+                      // so the raw XML doesn't flicker before extractThinking runs at done.
+                      const display = isStreaming
+                        ? msg.content
+                            .replace(/<think>[\s\S]*?<\/think>/g, "")
+                            .replace(/<think>[\s\S]*$/, "")
+                            .trim()
+                        : msg.content;
+                      if (!display) return null;
+                      return (
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: renderContent(display),
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
                 )}
 
-                {/* Thinking — shown below the message bubble, collapsed by default */}
-                {msg.role !== "tool" && msg.role !== "user" && msg.reasoning && (
-                  <div className="mt-1">
+                {/* Tool calls — attached to this message, shown below bubble */}
+                {toolCalls.length > 0 && toolCalls.map(({ msg: toolMsg, originalIdx: toolIdx }) => (
+                  <div key={toolIdx} className="mt-1">
                     <button
                       onClick={() =>
-                        setExpandedReasoning((prev) => {
+                        setExpandedTools((prev) => {
                           const next = new Set(prev);
-                          if (next.has(idx)) next.delete(idx);
-                          else next.add(idx);
+                          if (next.has(toolIdx)) next.delete(toolIdx);
+                          else next.add(toolIdx);
                           return next;
                         })
                       }
                       className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer select-none flex items-center gap-0.5 font-mono"
                     >
-                      {expandedReasoning.has(idx) ? (
+                      {expandedTools.has(toolIdx) ? (
+                        <RiArrowDownSLine className="size-3.5" />
+                      ) : (
+                        <RiArrowRightSLine className="size-3.5" />
+                      )}
+                      tool call
+                    </button>
+                    {expandedTools.has(toolIdx) && (
+                      <div className="mt-1 text-[11px] text-muted-foreground/70 font-mono whitespace-pre-wrap break-words border-l-2 border-muted-foreground/10 pl-2">
+                        {toolMsg.content}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Thinking — shown below the message bubble, collapsed by default */}
+                {msg.role !== "user" && msg.reasoning && (
+                  <div className="mt-1">
+                    <button
+                      onClick={() =>
+                        setExpandedReasoning((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(originalIdx)) next.delete(originalIdx);
+                          else next.add(originalIdx);
+                          return next;
+                        })
+                      }
+                      className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer select-none flex items-center gap-0.5 font-mono"
+                    >
+                      {expandedReasoning.has(originalIdx) ? (
                         <RiArrowDownSLine className="size-3.5" />
                       ) : (
                         <RiArrowRightSLine className="size-3.5" />
                       )}
                       thinking
                     </button>
-                    {expandedReasoning.has(idx) && (
+                    {expandedReasoning.has(originalIdx) && (
                       <div className="mt-1 text-[11px] text-muted-foreground/70 font-mono whitespace-pre-wrap break-words border-l-2 border-muted-foreground/10 pl-2">
                         {msg.reasoning}
                       </div>
