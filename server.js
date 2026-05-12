@@ -184,8 +184,8 @@ const IGNORED_DIRS = new Set([
 
 const app = express();
 
-// Security headers — DISABLED for local development & agent browser compatibility.
-// Re-enable in production by uncommenting the helmet block below.
+// Security headers via helmet — active in production, skipped in development.
+if (process.env.NODE_ENV !== 'development') {
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -201,6 +201,7 @@ app.use(helmet({
   },
   hsts: false,
 }));
+}
 
 app.use(express.json({ limit: '1mb' }));
 // Vite-built assets have content hashes — safe to cache aggressively
@@ -4903,7 +4904,7 @@ function priorityLabel(pri) {
 // ── GET /api/kanban/board — tasks grouped by status, plus board list
 // Reads directly from SQLite to avoid the CLI's recompute_ready() which
 // auto-promotes todo→ready regardless of what the user set via PATCH.
-app.get('/api/kanban/board', async (req, res) => {
+app.get('/api/kanban/board', requireAuth, async (req, res) => {
   const board = req.query.board || 'default';
   console.log(`[kanban] GET /board?board=${board}`);
   try {
@@ -4976,7 +4977,7 @@ app.get('/api/kanban/board', async (req, res) => {
 });
 
 // ── GET /api/kanban/tasks/:id — task detail (uses `hermes kanban show --json`)
-app.get('/api/kanban/tasks/:id', async (req, res) => {
+app.get('/api/kanban/tasks/:id', requireAuth, async (req, res) => {
   const board = req.query.board || 'default';
   console.log(`[kanban] GET /tasks/${req.params.id}?board=${board}`);
   try {
@@ -5002,7 +5003,7 @@ app.get('/api/kanban/tasks/:id', async (req, res) => {
 });
 
 // ── POST /api/kanban/tasks — create a new task
-app.post('/api/kanban/tasks', async (req, res) => {
+app.post('/api/kanban/tasks', requireAuth, requireCsrf, async (req, res) => {
   const { title, body, priority, assignee, board } = req.body || {};
   console.log(`[kanban] POST /tasks board=${board} title="${title}"`);
   if (!title || typeof title !== 'string') {
@@ -5036,7 +5037,7 @@ app.post('/api/kanban/tasks', async (req, res) => {
 });
 
 // ── PATCH /api/kanban/tasks/:id — update task fields (direct SQLite for fields CLI doesn't expose)
-app.patch('/api/kanban/tasks/:id', (req, res) => {
+app.patch('/api/kanban/tasks/:id', requireAuth, requireCsrf, (req, res) => {
   const board = req.query.board || 'default';
   console.log(`[kanban] PATCH /tasks/${req.params.id}?board=${board} body=`, req.body);
   const db = openKanbanDb(board, false);
@@ -5117,7 +5118,7 @@ app.patch('/api/kanban/tasks/:id', (req, res) => {
 });
 
 // ── POST /api/kanban/tasks/:id/comments — add a comment via CLI
-app.post('/api/kanban/tasks/:id/comments', async (req, res) => {
+app.post('/api/kanban/tasks/:id/comments', requireAuth, requireCsrf, async (req, res) => {
   const board = req.query.board || 'default';
   const { body } = req.body || {};
   if (!body) return res.status(400).json({ ok: false, error: 'comment body required' });
@@ -5135,7 +5136,7 @@ app.post('/api/kanban/tasks/:id/comments', async (req, res) => {
 });
 
 // ── DELETE /api/kanban/tasks/:id — archive via CLI
-app.delete('/api/kanban/tasks/:id', async (req, res) => {
+app.delete('/api/kanban/tasks/:id', requireAuth, requireCsrf, async (req, res) => {
   const board = req.query.board || 'default';
   console.log(`[kanban] DELETE /tasks/${req.params.id}?board=${board}`);
   try {
@@ -5150,7 +5151,7 @@ app.delete('/api/kanban/tasks/:id', async (req, res) => {
 });
 
 // ── GET /api/kanban/boards — list all boards via CLI
-app.get('/api/kanban/boards', async (req, res) => {
+app.get('/api/kanban/boards', requireAuth, async (req, res) => {
   console.log(`[kanban] GET /boards`);
   try {
     const output = await execHermes(['kanban', 'boards', 'list', '--json'], 10000);
@@ -5166,7 +5167,7 @@ app.get('/api/kanban/boards', async (req, res) => {
 });
 
 // ── POST /api/kanban/boards — create a new board (no --json support, parse text)
-app.post('/api/kanban/boards', async (req, res) => {
+app.post('/api/kanban/boards', requireAuth, requireCsrf, async (req, res) => {
   const { slug } = req.body || {};
   if (!slug) return res.status(400).json({ ok: false, error: 'slug required' });
   console.log(`[kanban] POST /boards slug=${slug}`);
@@ -5185,7 +5186,7 @@ app.post('/api/kanban/boards', async (req, res) => {
 });
 
 // ── POST /api/kanban/boards/:slug/switch — switch active board via CLI
-app.post('/api/kanban/boards/:slug/switch', async (req, res) => {
+app.post('/api/kanban/boards/:slug/switch', requireAuth, requireCsrf, async (req, res) => {
   console.log(`[kanban] POST /boards/${req.params.slug}/switch`);
   try {
     const output = await execHermes(['kanban', 'boards', 'switch', req.params.slug], 10000);
@@ -5199,7 +5200,7 @@ app.post('/api/kanban/boards/:slug/switch', async (req, res) => {
 });
 
 // ── GET /api/kanban/stats — board statistics via CLI
-app.get('/api/kanban/stats', async (req, res) => {
+app.get('/api/kanban/stats', requireAuth, async (req, res) => {
   const board = req.query.board || 'default';
   console.log(`[kanban] GET /stats?board=${board}`);
   try {

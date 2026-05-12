@@ -2,20 +2,21 @@
   "name": "hermes-control-interface",
   "version": "3.5.1",
   "description": "Self-hosted web dashboard for the Hermes AI agent stack",
-  "main": "server.js",
+  "main": "server/index.ts",
   "engines": {
     "node": ">=20.0.0",
     "bun": ">=1.0.0"
   },
   "scripts": {
-    "start": "bun run server.js",
+    "start": "bun run server/index.ts",
     "dev": "next dev",
-    "dev:server": "bun run server.js",
-    "dev:all": "concurrently \"bun run server.js\" \"next dev\"",
+    "dev:server": "bun run server/index.ts",
+    "dev:all": "concurrently \"bun run server/index.ts\" \"next dev\"",
     "build": "next build",
     "start:next": "next start",
     "setup": "bash install.sh",
     "test": "bun test",
+    "typecheck:server": "bunx tsc --project tsconfig.server.json --noEmit",
     "reset-password": "bun run scripts/reset-password.js"
   },
   "dependencies": {
@@ -49,9 +50,12 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^22",
+    "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.19.19",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "concurrently": "^9",
     "postcss": "^8",
     "tailwindcss": "^4",

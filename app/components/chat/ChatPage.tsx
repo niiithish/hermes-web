@@ -305,52 +305,20 @@ export default function ChatPage() {
                   }
                   return updated;
                 });
-                // Auto-expand reasoning during streaming so it's visible
-                if (streamingMsgIndexRef.current !== null) {
-                  setExpandedReasoning((prev) => {
-                    const next = new Set(prev);
-                    next.add(streamingMsgIndexRef.current!);
-                    return next;
-                  });
-                }
               } else if (data.type === "token") {
-                if (hasReasoningForMsgRef.current) {
-                  // Reasoning already started — show content immediately alongside it
-                  setMessages((prev) => {
-                    const updated = [...prev];
-                    const last = updated[updated.length - 1];
-                    if (last && last.role === "assistant") {
-                      updated[updated.length - 1] = {
-                        ...last,
-                        content: last.content + (data.content || ""),
-                      };
-                    }
-                    return updated;
-                  });
-                } else {
-                  // No reasoning yet — buffer content so it doesn't appear before
-                  // the Thinking section. Set a timeout in case no reasoning ever comes.
-                  pendingContentRef.current += data.content || "";
-                  if (!flushTimerRef.current) {
-                    flushTimerRef.current = setTimeout(() => {
-                      // No reasoning after 500ms — assume none, flush content
-                      setMessages((prev) => {
-                        const updated = [...prev];
-                        const last = updated[updated.length - 1];
-                        if (last && last.role === "assistant") {
-                          updated[updated.length - 1] = {
-                            ...last,
-                            content:
-                              last.content + pendingContentRef.current,
-                          };
-                          pendingContentRef.current = "";
-                        }
-                        return updated;
-                      });
-                      flushTimerRef.current = null;
-                    }, 500);
+                // Show content immediately — no buffering needed since Thinking
+                // is no longer auto-expanded, so content won't jump when it appears.
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.role === "assistant") {
+                    updated[updated.length - 1] = {
+                      ...last,
+                      content: last.content + (data.content || ""),
+                    };
                   }
-                }
+                  return updated;
+                });
               } else if (data.type === "done") {
                 if (data.sessionId) {
                   setCurrentSessionId(data.sessionId);
@@ -431,13 +399,8 @@ export default function ChatPage() {
         clearTimeout(flushTimerRef.current);
         flushTimerRef.current = null;
       }
-      // Auto-collapse reasoning now that streaming is done
+      // Reset streaming refs
       if (streamingMsgIndexRef.current !== null) {
-        setExpandedReasoning((prev) => {
-          const next = new Set(prev);
-          next.delete(streamingMsgIndexRef.current!);
-          return next;
-        });
         streamingMsgIndexRef.current = null;
       }
       reasoningBufferRef.current = "";
@@ -715,75 +678,60 @@ export default function ChatPage() {
 
                     {msg.role !== "tool" && (
                       <>
-                        {/* Thinking section inside the bubble */}
-                        {/* During streaming with no reasoning yet but content is buffered,
-                            show a stable placeholder so the bubble doesn't jump later. */}
-                        {isStreaming && !msg.reasoning && !msg.content && (
-                          <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
-                            <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse" />
-                            <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.2s]" />
-                            <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.4s]" />
-                          </div>
-                        )}
-                        {msg.reasoning && (
-                      <div className="mb-1">
-                        <button
-                          onClick={() =>
-                            setExpandedReasoning((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(idx)) next.delete(idx);
-                              else next.add(idx);
-                              return next;
-                            })
-                          }
-                          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none flex items-center gap-1"
-                        >
-                          <span className="text-muted-foreground font-medium inline-flex items-center gap-0.5">
-                            {expandedReasoning.has(idx) ? (
-                              <RiArrowDownSLine className="size-4" />
-                            ) : (
-                              <RiArrowRightSLine className="size-4" />
-                            )}
-                            Thinking
-                          </span>
-                        </button>
-                        {expandedReasoning.has(idx) && (
-                          <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-muted-foreground/20 pl-3 leading-relaxed">
-                            {msg.reasoning || (
-                              <span className="inline-flex items-center gap-1">
-                                <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse" />
-                                <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.2s]" />
-                                <span className="w-1 h-1 rounded-full bg-muted-foreground animate-pulse [animation-delay:0.4s]" />
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Content — strip partial <think> blocks during streaming so
-                        literal thinking tags don't flash before they're extracted. */}
-                    {msg.content && (() => {
-                      // During streaming, strip incomplete <think> blocks from display
-                      // so the raw XML doesn't flicker before extractThinking runs at done.
-                      const display = isStreaming
-                        ? msg.content
-                            .replace(/<think>[\s\S]*?<\/think>/g, "")
-                            .replace(/<think>[\s\S]*$/, "")
-                            .trim()
-                        : msg.content;
-                      if (!display) return null;
-                      return (
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: renderContent(display),
-                          }}
-                        />
-                      );
-                    })()}
+                        {/* Content — strip partial <think> blocks during streaming so
+                            literal thinking tags don't flash before they're extracted. */}
+                        {msg.content && (() => {
+                          // During streaming, strip incomplete <think> blocks from display
+                          // so the raw XML doesn't flicker before extractThinking runs at done.
+                          const display = isStreaming
+                            ? msg.content
+                                .replace(/<think>[\s\S]*?<\/think>/g, "")
+                                .replace(/<think>[\s\S]*$/, "")
+                                .trim()
+                            : msg.content;
+                          if (!display) return null;
+                          return (
+                            <div
+                              dangerouslySetInnerHTML={{
+                                __html: renderContent(display),
+                              }}
+                            />
+                          );
+                        })()}
                       </>
                     )}
                   </div>
                 )}
+
+                {/* Thinking — shown below the message bubble, collapsed by default */}
+                {msg.role !== "tool" && msg.role !== "user" && msg.reasoning && (
+                  <div className="mt-1">
+                    <button
+                      onClick={() =>
+                        setExpandedReasoning((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(idx)) next.delete(idx);
+                          else next.add(idx);
+                          return next;
+                        })
+                      }
+                      className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer select-none flex items-center gap-0.5 font-mono"
+                    >
+                      {expandedReasoning.has(idx) ? (
+                        <RiArrowDownSLine className="size-3.5" />
+                      ) : (
+                        <RiArrowRightSLine className="size-3.5" />
+                      )}
+                      thinking
+                    </button>
+                    {expandedReasoning.has(idx) && (
+                      <div className="mt-1 text-[11px] text-muted-foreground/70 font-mono whitespace-pre-wrap break-words border-l-2 border-muted-foreground/10 pl-2">
+                        {msg.reasoning}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {msg.token_count && msg.role === "assistant" && (
                   <div className="text-[10px] text-muted-foreground mt-0.5">
                     {msg.token_count} tokens
